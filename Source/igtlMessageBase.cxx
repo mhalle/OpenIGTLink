@@ -418,12 +418,34 @@ bool MessageBase::UnpackExtendedHeader()
     {
     igtl_extended_header* extended_header = (igtl_extended_header*)m_ExtendedHeader;
     igtl_extended_header_convert_byte_order(extended_header);
-    if( extended_header->extended_header_size != sizeof(igtl_extended_header) )
+
+    // Security: Validate extended_header_size is at least minimum size
+    if (extended_header->extended_header_size < sizeof(igtl_extended_header))
       {
-      // any extra data will be dropped, if the order of variables is changed, this will be seriously broken
-      // TODO : add error reporting?
+      return false;
       }
-    this->m_MessageId           = extended_header->message_id;
+
+    // Security: Validate extended_header_size doesn't exceed body
+    if (extended_header->extended_header_size > m_BodySizeToRead)
+      {
+      return false;
+      }
+
+    // Security: Validate metadata sizes (use 64-bit to prevent overflow)
+    igtl_uint64 metaDataTotal = (igtl_uint64)extended_header->meta_data_header_size +
+                                (igtl_uint64)extended_header->meta_data_size;
+    if (metaDataTotal > m_BodySizeToRead)
+      {
+      return false;
+      }
+
+    // Security: Validate combined sizes fit within body
+    if ((igtl_uint64)extended_header->extended_header_size + metaDataTotal > m_BodySizeToRead)
+      {
+      return false;
+      }
+
+    this->m_MessageId = extended_header->message_id;
 
     m_Content = &m_Body[extended_header->extended_header_size];
     m_MetaDataHeader = &m_Body[m_BodySizeToRead - extended_header->meta_data_header_size - extended_header->meta_data_size];

@@ -133,13 +133,31 @@ void webSocketServer::on_timer() {
 void webSocketServer::on_http(connection_hdl hdl) {
   // Upgrade our connection handle to a full connection_ptr
   server::connection_ptr con = m_endpoint.get_con_from_hdl(hdl);
-  
+
   std::ifstream file;
   std::string filename = con->get_resource();
   std::string response;
-  
+
+  // Security: Reject path traversal attempts
+  if (filename.find("..") != std::string::npos)
+    {
+    con->set_body("<!doctype html><html><head><title>Error 403</title></head>"
+                  "<body><h1>Error 403 - Forbidden</h1></body></html>");
+    con->set_status(websocketpp::http::status_code::forbidden);
+    return;
+    }
+
+  // Security: Reject paths with null bytes (truncation attacks)
+  if (filename.find('\0') != std::string::npos)
+    {
+    con->set_body("<!doctype html><html><head><title>Error 400</title></head>"
+                  "<body><h1>Error 400 - Bad Request</h1></body></html>");
+    con->set_status(websocketpp::http::status_code::bad_request);
+    return;
+    }
+
   //m_endpoint.get_alog().write(websocketpp::log::alevel::app, "http request1: "+filename);
-  
+
   if (filename == "/")
     {
     filename = m_docroot+"index.html";
@@ -148,9 +166,9 @@ void webSocketServer::on_http(connection_hdl hdl) {
     {
     filename = m_docroot+filename.substr(1);
     }
-  
+
   //m_endpoint.get_alog().write(websocketpp::log::alevel::app, "http request2: "+filename);
-  
+
   file.open(filename.c_str(), std::ios::in);
   if (!file)
     {
