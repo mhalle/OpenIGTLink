@@ -236,10 +236,32 @@ public:
 
   /// Gets the size (length) of the byte array for the image data.
   /// The size is defined by dimensions[0]*dimensions[1]*dimensions[2]*scalarSize*numComponents.
-  /// TODO: Should returned value be 64-bit integer?
-  int  GetImageSize()
+  /// Returns 0 if integer overflow would occur.
+  igtlUint64  GetImageSize()
   {
-    return dimensions[0]*dimensions[1]*dimensions[2]*GetScalarSize()*numComponents;
+    // Use 64-bit arithmetic to prevent overflow during multiplication
+    const igtlUint64 maxVal = ~(igtlUint64)0;  // Max value for unsigned 64-bit
+    igtlUint64 size = static_cast<igtlUint64>(dimensions[0]);
+
+    // Check for overflow at each multiplication step
+    if (dimensions[1] != 0 && size > maxVal / dimensions[1])
+      return 0;
+    size *= dimensions[1];
+
+    if (dimensions[2] != 0 && size > maxVal / dimensions[2])
+      return 0;
+    size *= dimensions[2];
+
+    int scalarSize = GetScalarSize();
+    if (scalarSize != 0 && size > maxVal / static_cast<igtlUint64>(scalarSize))
+      return 0;
+    size *= scalarSize;
+
+    if (numComponents != 0 && size > maxVal / static_cast<igtlUint64>(numComponents))
+      return 0;
+    size *= numComponents;
+
+    return size;
   };
 
   /// Returns coordinate system (COORDINATE_RAS or COORDINATE_LPS)
@@ -252,9 +274,32 @@ public:
   /// Gets the size (length) of the byte array for the subvolume image data.
   /// The size is defined by subDimensions[0]*subDimensions[1]*subDimensions[2]*
   /// scalarSize*numComponents.
+  /// Returns 0 if integer overflow would occur.
   igtlUint64 GetSubVolumeImageSize()
   {
-    return subDimensions[0]*subDimensions[1]*subDimensions[2]*GetScalarSize()*numComponents;
+    // Use 64-bit arithmetic to prevent overflow during multiplication
+    const igtlUint64 maxVal = ~(igtlUint64)0;  // Max value for unsigned 64-bit
+    igtlUint64 size = static_cast<igtlUint64>(subDimensions[0]);
+
+    // Check for overflow at each multiplication step
+    if (subDimensions[1] != 0 && size > maxVal / subDimensions[1])
+      return 0;
+    size *= subDimensions[1];
+
+    if (subDimensions[2] != 0 && size > maxVal / subDimensions[2])
+      return 0;
+    size *= subDimensions[2];
+
+    int scalarSize = GetScalarSize();
+    if (scalarSize != 0 && size > maxVal / static_cast<igtlUint64>(scalarSize))
+      return 0;
+    size *= scalarSize;
+
+    if (numComponents != 0 && size > maxVal / static_cast<igtlUint64>(numComponents))
+      return 0;
+    size *= numComponents;
+
+    return size;
   };
   
   /// Allocates a memory area for the scalar data based on the dimensions of the subvolume,

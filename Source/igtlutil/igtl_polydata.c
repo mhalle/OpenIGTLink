@@ -43,11 +43,29 @@ void igtl_export igtl_polydata_init_info(igtl_polydata_info * info)
 }
 
 
+/* Helper function to check for multiplication overflow */
+static int igtl_polydata_safe_multiply(size_t a, size_t b, size_t *result)
+{
+  if (a == 0 || b == 0)
+    {
+    *result = 0;
+    return 1;
+    }
+  if (a > ((size_t)-1) / b)
+    {
+    return 0;  /* Overflow would occur */
+    }
+  *result = a * b;
+  return 1;
+}
+
 int igtl_export igtl_polydata_alloc_info(igtl_polydata_info * info)
 {
   /*size_t size;*/
   unsigned int i;
-  
+  size_t alloc_size;
+  size_t temp_size;
+
   if (info == NULL)
     {
     return 0;
@@ -61,7 +79,16 @@ int igtl_export igtl_polydata_alloc_info(igtl_polydata_info * info)
     }
   if (info->header.npoints > 0)
     {
-    info->points = malloc(info->header.npoints * sizeof(igtl_float32) * 3);
+    /* Check for overflow: npoints * sizeof(igtl_float32) * 3 */
+    if (!igtl_polydata_safe_multiply(info->header.npoints, sizeof(igtl_float32), &temp_size))
+      {
+      return 0;  /* Overflow */
+      }
+    if (!igtl_polydata_safe_multiply(temp_size, 3, &alloc_size))
+      {
+      return 0;  /* Overflow */
+      }
+    info->points = malloc(alloc_size);
     if (info->points == NULL)
       {
       return 0;
@@ -145,7 +172,12 @@ int igtl_export igtl_polydata_alloc_info(igtl_polydata_info * info)
 
   if (info->header.nattributes > 0)
     {
-    info->attributes = malloc(sizeof(igtl_polydata_attribute) * info->header.nattributes);
+    /* Check for overflow: sizeof(igtl_polydata_attribute) * nattributes */
+    if (!igtl_polydata_safe_multiply(sizeof(igtl_polydata_attribute), info->header.nattributes, &alloc_size))
+      {
+      return 0;  /* Overflow */
+      }
+    info->attributes = malloc(alloc_size);
     if (info->attributes == NULL)
       {
       return 0;
@@ -423,27 +455,56 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
   /* Attributes */
   for (i = 0; i < info->header.nattributes; i ++)
     {
+    size_t attr_alloc_size;
+    size_t temp_n;
+
     if (info->attributes[i].type == IGTL_POLY_ATTR_TYPE_SCALAR)
       {
-      n = info->attributes[i].ncomponents * info->attributes[i].n;
-      s = n * sizeof(igtl_float32);
+      /* Check for overflow: ncomponents * n */
+      if (!igtl_polydata_safe_multiply(info->attributes[i].ncomponents, info->attributes[i].n, &temp_n))
+        {
+        return 0;  /* Overflow */
+        }
+      n = (int)temp_n;
       }
     else if (info->attributes[i].type == IGTL_POLY_ATTR_TYPE_NORMAL)
       {
-      n = 3 * info->attributes[i].n;
-      s = n * sizeof(igtl_float32);
+      /* Check for overflow: 3 * n */
+      if (!igtl_polydata_safe_multiply(3, info->attributes[i].n, &temp_n))
+        {
+        return 0;  /* Overflow */
+        }
+      n = (int)temp_n;
       }
     else if (info->attributes[i].type == IGTL_POLY_ATTR_TYPE_VECTOR)
       {
-      n = 3 * info->attributes[i].n;
-      s = n * sizeof(igtl_float32);
+      /* Check for overflow: 3 * n */
+      if (!igtl_polydata_safe_multiply(3, info->attributes[i].n, &temp_n))
+        {
+        return 0;  /* Overflow */
+        }
+      n = (int)temp_n;
       }
     else /* TENSOR */
       {
-      n = 9 * info->attributes[i].n;
-      s = n * sizeof(igtl_float32);
+      /* Check for overflow: 9 * n */
+      if (!igtl_polydata_safe_multiply(9, info->attributes[i].n, &temp_n))
+        {
+        return 0;  /* Overflow */
+        }
+      n = (int)temp_n;
       }
-    info->attributes[i].data = (igtl_float32*)malloc((size_t)s);
+    /* Check for overflow: n * sizeof(igtl_float32) */
+    if (!igtl_polydata_safe_multiply((size_t)n, sizeof(igtl_float32), &attr_alloc_size))
+      {
+      return 0;  /* Overflow */
+      }
+    s = (igtl_uint32)attr_alloc_size;
+    info->attributes[i].data = (igtl_float32*)malloc(attr_alloc_size);
+    if (info->attributes[i].data == NULL)
+      {
+      return 0;  /* Allocation failed */
+      }
     ptr32_dst = (igtl_uint32*)info->attributes[i].data;
     ptr32_src = (igtl_uint32*)ptr;
     ptr32_src_end = ptr32_src + n;

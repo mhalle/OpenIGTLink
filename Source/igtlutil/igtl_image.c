@@ -25,6 +25,7 @@ igtl_uint64 igtl_export igtl_image_get_data_size(igtl_image_header * header)
   igtl_uint64 sk;
   igtl_uint64 sp;
   igtl_uint64 data_size;
+  const igtl_uint64 maxVal = ~(igtl_uint64)0;  /* Max value for unsigned 64-bit */
 
   si = header->subvol_size[0];
   sj = header->subvol_size[1];
@@ -49,7 +50,20 @@ igtl_uint64 igtl_export igtl_image_get_data_size(igtl_image_header * header)
       break;
     }
 
-  data_size = si*sj*sk*sp;
+  /* Check for integer overflow at each multiplication step */
+  data_size = si;
+  if (sj != 0 && data_size > maxVal / sj)
+    return 0;  /* Overflow */
+  data_size *= sj;
+
+  if (sk != 0 && data_size > maxVal / sk)
+    return 0;  /* Overflow */
+  data_size *= sk;
+
+  if (sp != 0 && data_size > maxVal / sp)
+    return 0;  /* Overflow */
+  data_size *= sp;
+
   return data_size;
 }
 
@@ -210,6 +224,7 @@ igtl_uint64 igtl_export igtl_image_get_crc(igtl_image_header * header, void* ima
 {
   igtl_uint64   crc;
   igtl_uint64   img_size;
+  const igtl_uint64 maxVal = ~(igtl_uint64)0;  /* Max value for unsigned 64-bit */
 
   /* calculate image size (we do not call igtl_image_get_data_size()
    * because header has already been serialized.
@@ -248,8 +263,21 @@ igtl_uint64 igtl_export igtl_image_get_crc(igtl_image_header * header, void* ima
     sp = 0;
     break;
   }
-  
-  img_size = si*sj*sk*sp;
+
+  /* Check for integer overflow at each multiplication step */
+  img_size = si;
+  if (sj != 0 && img_size > maxVal / sj)
+    return 0;  /* Overflow - return 0 CRC to indicate error */
+  img_size *= sj;
+
+  if (sk != 0 && img_size > maxVal / sk)
+    return 0;  /* Overflow */
+  img_size *= sk;
+
+  if (sp != 0 && img_size > maxVal / sp)
+    return 0;  /* Overflow */
+  img_size *= sp;
+
   crc = crc64(0, 0, 0);
   crc = crc64((unsigned char*) header, IGTL_IMAGE_HEADER_SIZE, crc);
   crc = crc64((unsigned char*) image, (int)img_size, crc);
