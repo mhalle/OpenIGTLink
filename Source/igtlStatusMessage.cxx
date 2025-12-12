@@ -105,15 +105,18 @@ int StatusMessage::PackContent()
   // Allocate buffer
   AllocateBuffer();
   m_StatusHeader = this->m_Content;
-  
+
   m_StatusMessage = (char*)&m_StatusHeader[IGTL_STATUS_HEADER_SIZE];
   igtl_status_header* status_header = (igtl_status_header*)this->m_StatusHeader;
 
   status_header->code    = static_cast<igtlUint16>(this->m_Code);
   status_header->subcode = this->m_SubCode;
   strncpy(status_header->error_name, this->m_ErrorName, IGTL_STATUS_ERROR_NAME_LENGTH);
-  strcpy(this->m_StatusMessage, this->m_StatusMessageString.c_str());
-  
+  // Use safe string copy with explicit size (buffer allocated for string length + 1 for null terminator)
+  size_t msgBufferSize = this->m_StatusMessageString.size() + 1;
+  strncpy(this->m_StatusMessage, this->m_StatusMessageString.c_str(), msgBufferSize);
+  this->m_StatusMessage[msgBufferSize - 1] = '\0';  // Ensure null termination
+
   igtl_status_convert_byte_order(status_header);
 
   return 1;

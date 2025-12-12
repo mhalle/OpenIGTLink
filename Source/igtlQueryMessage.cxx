@@ -64,11 +64,12 @@ std::string QueryMessage::GetDeviceUID()
   
 int QueryMessage::SetDataType(const char* dataType)
 {
-  if (dataType == NULL || strlen(dataType) > IGTL_QUERY_DATE_TYPE_SIZE) /* If the length is beyond the range specified by the spec */
+  if (dataType == NULL || strlen(dataType) >= IGTL_QUERY_DATE_TYPE_SIZE) /* If the length is beyond the range specified by the spec */
   {
     return 0;
   }
-  strcpy((char*)m_DataType, dataType);
+  strncpy((char*)m_DataType, dataType, IGTL_QUERY_DATE_TYPE_SIZE - 1);
+  m_DataType[IGTL_QUERY_DATE_TYPE_SIZE - 1] = '\0';
   return 1;
 }
 

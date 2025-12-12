@@ -72,12 +72,18 @@ int CommandMessage::SetCommandId(igtlUint32 aId)
 
 int CommandMessage::SetCommandName(const char* aCommandName)
 {
-  if (strlen(aCommandName) > IGTL_COMMAND_NAME_SIZE) /* If the length is beyond the range specified by the spec */
+  if (aCommandName == NULL)
+    {
+    return 0;
+    }
+  size_t len = strlen(aCommandName);
+  if (len >= IGTL_COMMAND_NAME_SIZE) /* If the length is beyond the range specified by the spec */
     {
     return 0;
     }
   m_IsBodyPacked = false;
-  strcpy((char*)m_CommandName, aCommandName);
+  strncpy((char*)m_CommandName, aCommandName, IGTL_COMMAND_NAME_SIZE - 1);
+  m_CommandName[IGTL_COMMAND_NAME_SIZE - 1] = '\0';
   return 1;
 }
 
@@ -219,24 +225,31 @@ int CommandMessage::UnpackContent()
 
 int RTSCommandMessage::SetCommandErrorString(const char* anErrorString)
 {
-  if (strlen(anErrorString) > IGTL_COMMAND_NAME_SIZE) /* If the length is beyond the range specified by the spec */
+  if (anErrorString == NULL)
+    {
+    return 0;
+    }
+  size_t len = strlen(anErrorString);
+  if (len >= IGTL_COMMAND_NAME_SIZE) /* If the length is beyond the range specified by the spec */
     {
     return 0;
     }
   m_IsBodyPacked = false;
-  strcpy((char*)m_CommandName, anErrorString);
+  strncpy((char*)m_CommandName, anErrorString, IGTL_COMMAND_NAME_SIZE - 1);
+  m_CommandName[IGTL_COMMAND_NAME_SIZE - 1] = '\0';
   return 1;
 }
 
 
 int RTSCommandMessage::SetCommandErrorString(const std::string& anErrorString)
 {
-  if( anErrorString.length() > IGTL_COMMAND_NAME_SIZE )
+  if (anErrorString.length() >= IGTL_COMMAND_NAME_SIZE)
     {
     return 0;
     }
   m_IsBodyPacked = false;
-  strcpy((char*)m_CommandName, anErrorString.c_str());
+  strncpy((char*)m_CommandName, anErrorString.c_str(), IGTL_COMMAND_NAME_SIZE - 1);
+  m_CommandName[IGTL_COMMAND_NAME_SIZE - 1] = '\0';
   return 1;
 }
 

@@ -600,15 +600,22 @@ void IGTLCommon_EXPORT SetPolyDataInfoAttribute(igtl_polydata_info * info, PolyD
       attr->ncomponents = src->GetNumberOfComponents();
       attr->n = src->GetSize();
       //attr->name = const_cast<char*>(src->GetName());
-      // TODO: aloways allocating memory isn't a good approach...
+      // TODO: always allocating memory isn't a good approach...
       if (attr->name)
         {
         free(attr->name);
+        attr->name = NULL;
         }
-      attr->name =  (char *) malloc(strlen(src->GetName())+1);
-      if (attr->name)
+      const char* srcName = src->GetName();
+      if (srcName != NULL)
         {
-        strcpy(attr->name, src->GetName());
+        size_t nameLen = strlen(srcName);
+        attr->name = (char *) malloc(nameLen + 1);
+        if (attr->name)
+          {
+          strncpy(attr->name, srcName, nameLen);
+          attr->name[nameLen] = '\0';
+          }
         }
       if (attr->data)
         {

@@ -156,7 +156,7 @@ namespace igtl
     hints.ai_socktype = SOCK_DGRAM;
     // maximum port number is less than 65536, 128byte is sufficient. std::to_string needs c++ 11 support
     char portStr[128];
-    sprintf(portStr, "%d", this->PortNum);
+    snprintf(portStr, sizeof(portStr), "%d", this->PortNum);
     if (0 != (err = getaddrinfo(this->IPAddress, portStr, &hints, &info)))
       {
       return -1;
@@ -272,8 +272,14 @@ namespace igtl
   {
     int i;
     int max_fd = -1;
+
+    // Validate parameters
+    if (selected_index == NULL)
+      {
+      return -1;
+      }
     *selected_index = -1;
-    if (size <  0)
+    if (sockets_to_select == NULL || size <= 0)
       {
       return -1;
       }
@@ -486,11 +492,18 @@ namespace igtl
   
   int GeneralSocket::SetIPAddress(const char* ip)
   {
-    if(strcpy(this->IPAddress,ip))
+    if (ip == NULL)
       {
-      return 0;
+      return -1;
       }
-    return -1;
+    size_t len = strlen(ip);
+    if (len >= IP4AddressStrLen)
+      {
+      return -1;  // IP address too long for buffer
+      }
+    strncpy(this->IPAddress, ip, IP4AddressStrLen - 1);
+    this->IPAddress[IP4AddressStrLen - 1] = '\0';
+    return 0;
   }
   
   int GeneralSocket::SetPortNumber(igtl_uint16 port)

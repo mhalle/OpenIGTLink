@@ -398,7 +398,12 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
     if (name_length <= IGTL_POLY_MAX_ATTR_NAME_LEN)
       {
       info->attributes[i].name = malloc(name_length+1);
-      strcpy(info->attributes[i].name, ptr);
+      if (info->attributes[i].name == NULL)
+        {
+        return 0;  /* allocation failed */
+        }
+      strncpy(info->attributes[i].name, ptr, name_length);
+      info->attributes[i].name[name_length] = '\0';
       }
     else
       {
@@ -597,12 +602,17 @@ int igtl_export igtl_polydata_pack(igtl_polydata_info * info, void * byte_array,
   total_name_length = 0;
   for (i = 0; i < info->header.nattributes; i ++)
     {
+    if (info->attributes[i].name == NULL)
+      {
+      return 0;
+      }
     name_length = strlen(info->attributes[i].name);
     if (name_length > IGTL_POLY_MAX_ATTR_NAME_LEN)
       {
       return 0;
       }
-    strcpy(ptr, info->attributes[i].name);
+    strncpy(ptr, info->attributes[i].name, name_length);
+    ptr[name_length] = '\0';
     total_name_length += (name_length+1);
     ptr += (name_length+1);
     }

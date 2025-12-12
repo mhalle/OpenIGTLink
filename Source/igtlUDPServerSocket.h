@@ -49,7 +49,15 @@ public:
   GroupDest(const char* add, igtl_uint16 port, unsigned int groupID)
   {
     this->address = new unsigned char[IP4AddressStrLen];
-    strcpy((char*)this->address, add);
+    if (add != NULL)
+      {
+      strncpy((char*)this->address, add, IP4AddressStrLen - 1);
+      this->address[IP4AddressStrLen - 1] = '\0';
+      }
+    else
+      {
+      this->address[0] = '\0';
+      }
     this->portNum = port;
     this->groupID = groupID;
   };
@@ -64,7 +72,15 @@ public:
   ClientDest(const char* add, igtl_uint16 port, unsigned int clientID)
   {
     this->address = new unsigned char[IP4AddressStrLen];
-    strcpy((char*)this->address, add);
+    if (add != NULL)
+      {
+      strncpy((char*)this->address, add, IP4AddressStrLen - 1);
+      this->address[IP4AddressStrLen - 1] = '\0';
+      }
+    else
+      {
+      this->address[0] = '\0';
+      }
     this->portNum = port;
     this->clientID = clientID;
   };
