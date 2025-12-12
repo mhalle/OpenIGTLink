@@ -248,27 +248,33 @@ int Socket::Connect(int socketdescriptor, const char* hostName, int port)
     return -1;
     }
 
-  struct hostent* hp;
-  hp = gethostbyname(hostName);
-  if (!hp)
+  if (hostName == NULL)
     {
-    unsigned long addr = inet_addr(hostName);
-    hp = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
-    }
- 
-  if (!hp)
-    {
-    // vtkErrorMacro("Unknown host: " << hostName);
     return -1;
     }
 
-  struct sockaddr_in name;
-  name.sin_family = AF_INET;
-  memcpy(&name.sin_addr, hp->h_addr, hp->h_length);
-  name.sin_port = htons(port);
+  // Use getaddrinfo() instead of deprecated gethostbyname()/inet_addr()
+  // getaddrinfo() is thread-safe and handles both hostnames and IP addresses
+  struct addrinfo hints, *result = NULL;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_INET;        // IPv4 for compatibility
+  hints.ai_socktype = SOCK_STREAM;
 
-  int r = connect(socketdescriptor, reinterpret_cast<sockaddr*>(&name), 
-                 sizeof(name));
+  char portStr[16];
+  snprintf(portStr, sizeof(portStr), "%d", port);
+
+  int status = getaddrinfo(hostName, portStr, &hints, &result);
+  if (status != 0 || result == NULL)
+    {
+    if (result)
+      freeaddrinfo(result);
+    return -1;
+    }
+
+  int r = connect(socketdescriptor, result->ai_addr,
+                  static_cast<int>(result->ai_addrlen));
+
+  freeaddrinfo(result);
 
   return r;
 }
