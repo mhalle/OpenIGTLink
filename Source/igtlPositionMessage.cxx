@@ -235,10 +235,14 @@ int PositionMessage::UnpackContent()
       this->m_PackType = WITH_QUATERNION3;
       igtl_position_convert_byte_order_quaternion3(p);
       break;
-    default: //IGTL_POSITION_MESSAGE_DEFAULT_SIZE
+    case IGTL_POSITION_MESSAGE_DEFAULT_SIZE:
       this->m_PackType = ALL;
       igtl_position_convert_byte_order(p);
       break;
+    default:
+      // Security: Reject unexpected payload sizes to prevent OOB reads
+      // Only the three defined sizes are valid; anything else is malformed
+      return 0;
     }
 
   this->m_Position[0]   = p->position[0];

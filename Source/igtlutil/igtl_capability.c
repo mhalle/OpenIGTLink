@@ -122,7 +122,17 @@ int igtl_export igtl_capability_unpack(void * byte_array, igtl_capability_info *
   if (info->ntypes != ntypes)
     {
     igtl_capability_free_info(info);
-    igtl_capability_alloc_info(info, ntypes);
+    /* Security: Check allocation return value to prevent null pointer dereference */
+    if (igtl_capability_alloc_info(info, ntypes) == 0)
+      {
+      return 0;  /* Allocation failed (e.g., oversized ntypes) */
+      }
+    }
+
+  /* Security: Verify typenames was allocated before dereferencing */
+  if (info->typenames == NULL)
+    {
+    return 0;
     }
 
   ptr = byte_array;

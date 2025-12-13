@@ -124,6 +124,14 @@ int StatusMessage::PackContent()
 
 int StatusMessage::UnpackContent()
 {
+  // Security: Validate content size before any buffer access
+  bool isUnpacked(true);
+  igtl_uint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_STATUS_HEADER_SIZE)
+    {
+    return 0;  // Content too small to contain status header
+    }
+
   m_StatusHeader = this->m_Content;
   m_StatusMessage = (char*)&m_StatusHeader[IGTL_STATUS_HEADER_SIZE];
 
@@ -135,15 +143,21 @@ int StatusMessage::UnpackContent()
   this->m_ErrorName[IGTL_STATUS_ERROR_NAME_LENGTH-1] = '\0';
   strncpy(this->m_ErrorName, status_header->error_name, IGTL_STATUS_ERROR_NAME_LENGTH);
 
-  // make sure that the status message in the pack ends with '\0'
-  bool isUnpacked(true);
-  if (m_StatusMessage[CalculateReceiveContentSize(isUnpacked)-IGTL_STATUS_HEADER_SIZE-1] == '\0')
+  // Security: Check content has at least header + 1 byte for null terminator check
+  // to prevent unsigned underflow in array index calculation
+  if (contentSize >= IGTL_STATUS_HEADER_SIZE + 1)
     {
-    this->m_StatusMessageString = m_StatusMessage;
+    // make sure that the status message in the pack ends with '\0'
+    igtl_uint64 msgLength = contentSize - IGTL_STATUS_HEADER_SIZE;
+    if (m_StatusMessage[msgLength - 1] == '\0')
+      {
+      this->m_StatusMessageString = m_StatusMessage;
+      }
     }
   else
     {
-    //std::cerr << "status message in the pack does not end with '\0'" << std::endl;
+    // No status message present (header only)
+    this->m_StatusMessageString.clear();
     }
 
   return 1;
