@@ -550,10 +550,18 @@ int  RTSBindMessage::PackContent()
 
 
 int  RTSBindMessage::UnpackContent()
-{ 
+{
+  /* Security: Validate content size before reading status byte */
+  bool isUnpacked = true;
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < sizeof(igtlUint8))
+    {
+    return 0;
+    }
+
   this->m_Status = * (igtlUint8 * )this->m_Content;
 
-  return 1; 
+  return 1;
 }
 
 
