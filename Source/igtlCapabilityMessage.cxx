@@ -121,17 +121,25 @@ int CapabilityMessage::PackContent()
 
 int CapabilityMessage::UnpackContent()
 {
-
   igtl_capability_info info;
 
   igtl_capability_init_info(&info);
   bool isUnpacked(true);
-  igtl_capability_unpack(this->m_Content, &info, this->CalculateReceiveContentSize(isUnpacked));
+  int unpackResult = igtl_capability_unpack(this->m_Content, &info, this->CalculateReceiveContentSize(isUnpacked));
+
+  /* Security: Check unpack return value before using parsed data */
+  if (unpackResult == 0 || !isUnpacked)
+    {
+    igtl_capability_free_info(&info);
+    return 0;
+    }
 
   int ntypes = info.ntypes;
 
-  if(ntypes == 0)
+  /* Security: Also check that typenames was allocated */
+  if (ntypes == 0 || info.typenames == NULL)
     {
+    igtl_capability_free_info(&info);
     return 0;
     }
 
@@ -149,8 +157,8 @@ int CapabilityMessage::UnpackContent()
       }
     this->m_TypeNames.push_back(buf);
     }
-  
 
+  igtl_capability_free_info(&info);
   return 1;
 }
 

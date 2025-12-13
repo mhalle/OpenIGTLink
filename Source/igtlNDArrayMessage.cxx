@@ -238,8 +238,17 @@ int NDArrayMessage::PackContent()
 int NDArrayMessage::UnpackContent()
 {
   igtl_ndarray_info info;
+  igtl_ndarray_init_info(&info);
+
   bool isUnpacked(true);
-  igtl_ndarray_unpack(IGTL_TYPE_PREFIX_NONE, this->m_Content, &info, this->CalculateReceiveContentSize(isUnpacked));
+  int unpackResult = igtl_ndarray_unpack(IGTL_TYPE_PREFIX_NONE, this->m_Content, &info, this->CalculateReceiveContentSize(isUnpacked));
+
+  /* Security: Check unpack return value before using parsed data */
+  if (unpackResult == 0 || !isUnpacked || info.size == NULL || info.array == NULL)
+    {
+    igtl_ndarray_free_info(&info);
+    return 0;
+    }
 
   this->m_Type = info.type;
   ArrayBase::IndexType size;
@@ -279,13 +288,15 @@ int NDArrayMessage::UnpackContent()
       this->m_Array = new Array<igtlComplex>;
       break;
     default:
+      igtl_ndarray_free_info(&info);
       return 0;
       break;
     }
 
   this->m_Array->SetSize(size);
   memcpy(this->m_Array->GetRawArray(), info.array, this->m_Array->GetRawArraySize());
-  
+
+  igtl_ndarray_free_info(&info);
   return 1;
 }
 
