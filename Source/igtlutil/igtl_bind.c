@@ -238,8 +238,15 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info, igtl_uint6
     total_child_size += child_size_padded;
     }
 
-  /* Security: Validate child bodies fit in buffer */
-  if (size < header_section_size + nametable_size + total_child_size)
+  /* Security: Validate child bodies fit in buffer with overflow guard */
+  const igtl_uint64 maxVal = ~(igtl_uint64)0;
+  if (header_section_size > maxVal - nametable_size ||
+      header_section_size + nametable_size > maxVal - total_child_size)
+    {
+    return 0;  /* Sum would overflow */
+    }
+  igtl_uint64 required_size = header_section_size + nametable_size + total_child_size;
+  if (size < required_size)
     {
     return 0;
     }
