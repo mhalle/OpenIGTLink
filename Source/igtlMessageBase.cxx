@@ -787,7 +787,8 @@ void MessageBase::InitBuffer()
     // m_IsHeaderUnpacked status is not changed in this case.
     unsigned char* old = m_Header;
     m_Header = new unsigned char [message_size];
-    memcpy(m_Header, old, std::min<int>(m_MessageSize, message_size));
+    // Use igtl_uint64 to avoid truncation of 64-bit size values
+    memcpy(m_Header, old, std::min<igtl_uint64>(m_MessageSize, message_size));
     delete [] old;
     m_IsBodyUnpacked = false;
     }
@@ -838,7 +839,8 @@ void MessageBase::AllocateBuffer(igtlUint64 contentSize)
     // m_IsHeaderUnpacked status is not changed in this case.
     unsigned char* old = m_Header;
     m_Header = new unsigned char [message_size];
-    memcpy(m_Header, old, std::min<int>(m_MessageSize, message_size));
+    // Use igtl_uint64 to avoid truncation of 64-bit size values
+    memcpy(m_Header, old, std::min<igtl_uint64>(m_MessageSize, message_size));
     delete [] old;
     m_IsBodyUnpacked = false;
     }

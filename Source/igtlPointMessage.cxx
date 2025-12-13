@@ -272,13 +272,13 @@ int PointMessage::UnpackContent()
     {
     PointElement::Pointer elemClass = PointElement::New();
 
-    // Add '\n' at the end of each string
+    // Add null terminator at the end of each string
     // (necessary for a case, where a string reaches the maximum length.)
-    strbuf[IGTL_POINT_LEN_NAME] = '\n';
+    strbuf[IGTL_POINT_LEN_NAME] = '\0';
     strncpy(strbuf, (char*)element->name, IGTL_POINT_LEN_NAME);
     elemClass->SetName((const char*)strbuf);
-    
-    strbuf[IGTL_POINT_LEN_GROUP_NAME] = '\n';
+
+    strbuf[IGTL_POINT_LEN_GROUP_NAME] = '\0';
     strncpy(strbuf, (char*)element->group_name, IGTL_POINT_LEN_GROUP_NAME);
     elemClass->SetGroupName(strbuf);
 
@@ -286,7 +286,7 @@ int PointMessage::UnpackContent()
     elemClass->SetPosition(element->position);
     elemClass->SetRadius(element->radius);
 
-    strbuf[IGTL_POINT_LEN_OWNER] = '\n';
+    strbuf[IGTL_POINT_LEN_OWNER] = '\0';
     strncpy(strbuf, (char*)element->owner, IGTL_POINT_LEN_OWNER);
     elemClass->SetOwner(strbuf);
 

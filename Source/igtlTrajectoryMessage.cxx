@@ -338,13 +338,13 @@ int TrajectoryMessage::UnpackContent()
     {
     TrajectoryElement::Pointer elemClass = TrajectoryElement::New();
 
-    // Add '\n' at the end of each string
+    // Add null terminator at the end of each string
     // (necessary for a case, where a string reaches the maximum length.)
-    strbuf[IGTL_TRAJECTORY_LEN_NAME] = '\n';
+    strbuf[IGTL_TRAJECTORY_LEN_NAME] = '\0';
     strncpy(strbuf, (char*)element->name, IGTL_TRAJECTORY_LEN_NAME);
     elemClass->SetName((const char*)strbuf);
-    
-    strbuf[IGTL_TRAJECTORY_LEN_GROUP_NAME] = '\n';
+
+    strbuf[IGTL_TRAJECTORY_LEN_GROUP_NAME] = '\0';
     strncpy(strbuf, (char*)element->group_name, IGTL_TRAJECTORY_LEN_GROUP_NAME);
     elemClass->SetGroupName(strbuf);
 
@@ -355,7 +355,7 @@ int TrajectoryMessage::UnpackContent()
     elemClass->SetTargetPosition(element->target_pos);
     elemClass->SetRadius(element->radius);
 
-    strbuf[IGTL_TRAJECTORY_LEN_OWNER] = '\n';
+    strbuf[IGTL_TRAJECTORY_LEN_OWNER] = '\0';
     strncpy(strbuf, (char*)element->owner_name, IGTL_TRAJECTORY_LEN_OWNER);
     elemClass->SetOwner(strbuf);
 

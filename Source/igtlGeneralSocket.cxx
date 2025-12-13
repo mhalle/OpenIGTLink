@@ -567,9 +567,12 @@ namespace igtl
     
     struct sockaddr_in dest;
     dest.sin_family = AF_INET;
-    
-    // store this IP address in dest:
-    dest.sin_addr.s_addr = inet_addr(this->IPAddress);
+
+    // Use inet_pton() instead of deprecated inet_addr()
+    if (inet_pton(AF_INET, this->IPAddress, &dest.sin_addr) != 1)
+      {
+      return 0;  // Invalid address
+      }
     dest.sin_port = htons(this->PortNum);
     
     int n = sendto(this->m_SocketDescriptor, (char*)data, length, 0, (struct sockaddr*)&dest, sizeof dest);

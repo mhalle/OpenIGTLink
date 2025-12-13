@@ -59,11 +59,13 @@ UDPServerSocket::~UDPServerSocket()
 bool UDPServerSocket::IsMulticastAddreesValid(const char* add)
 {
   //224.0.0.0 through 224.0.0.255, are not routable
-  igtl_uint32 address = inet_addr(add); // to do: make sure the endian is correct
-  if(igtl_is_little_endian())
-  {
-    address = BYTE_SWAP_INT32(address);
-  }
+  struct in_addr addr;
+  // Use inet_pton() instead of deprecated inet_addr()
+  if (inet_pton(AF_INET, add, &addr) != 1)
+    {
+    return false;  // Invalid address
+    }
+  igtl_uint32 address = ntohl(addr.s_addr);  // Convert to host byte order
   return address >  0xE00000FF &&
   address <= 0xEFFFFFFF;
 }

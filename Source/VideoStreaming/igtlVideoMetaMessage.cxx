@@ -379,21 +379,21 @@ int VideoMetaMessage::UnpackContent()
     {
     VideoMetaElement::Pointer elemClass = VideoMetaElement::New();
 
-    // Add '\n' at the end of each string
+    // Add null terminator at the end of each string
     // (necessary for a case, where a string reaches the maximum length.)
-    strbuf[IGTL_VIDEOMETA_LEN_NAME] = '\n';
+    strbuf[IGTL_VIDEOMETA_LEN_NAME] = '\0';
     strncpy(strbuf, (char*)element->name, IGTL_VIDEOMETA_LEN_NAME);
     elemClass->SetName((const char*)strbuf);
-    
-    strbuf[IGTL_VIDEOMETA_LEN_DEVICE_NAME] = '\n';
+
+    strbuf[IGTL_VIDEOMETA_LEN_DEVICE_NAME] = '\0';
     strncpy(strbuf, (char*)element->device_name, IGTL_VIDEOMETA_LEN_DEVICE_NAME);
     elemClass->SetDeviceName(strbuf);
 
-    strbuf[IGTL_VIDEOMETA_LEN_PATIENT_NAME] = '\n';
+    strbuf[IGTL_VIDEOMETA_LEN_PATIENT_NAME] = '\0';
     strncpy(strbuf, (char*)element->patient_name, IGTL_VIDEOMETA_LEN_PATIENT_NAME);
     elemClass->SetPatientName(strbuf);
 
-    strbuf[IGTL_VIDEOMETA_LEN_PATIENT_ID] = '\n';
+    strbuf[IGTL_VIDEOMETA_LEN_PATIENT_ID] = '\0';
     strncpy(strbuf, (char*)element->patient_id, IGTL_VIDEOMETA_LEN_PATIENT_ID);
     elemClass->SetPatientID(strbuf);
     

@@ -270,21 +270,21 @@ int LabelMetaMessage::UnpackContent()
     {
     LabelMetaElement::Pointer elemClass = LabelMetaElement::New();
 
-    // Add '\n' at the end of each string
-    // (neccesary for a case, where a string reaches the maximum length.)
-    strbuf[IGTL_LBMETA_LEN_NAME] = '\n';
+    // Add null terminator at the end of each string
+    // (necessary for a case, where a string reaches the maximum length.)
+    strbuf[IGTL_LBMETA_LEN_NAME] = '\0';
     strncpy(strbuf, (char*)element->name, IGTL_LBMETA_LEN_NAME);
     elemClass->SetName((const char*)strbuf);
-    
-    strbuf[IGTL_LBMETA_LEN_DEVICE_NAME] = '\n';
+
+    strbuf[IGTL_LBMETA_LEN_DEVICE_NAME] = '\0';
     strncpy(strbuf, (char*)element->device_name, IGTL_LBMETA_LEN_DEVICE_NAME);
     elemClass->SetDeviceName(strbuf);
-    
+
     elemClass->SetLabel(element->label);
     elemClass->SetRGBA(element->rgba);
     elemClass->SetSize(element->size);
 
-    strbuf[IGTL_LBMETA_LEN_OWNER] = '\n';
+    strbuf[IGTL_LBMETA_LEN_OWNER] = '\0';
     strncpy(strbuf, (char*)element->owner, IGTL_LBMETA_LEN_OWNER);
     elemClass->SetOwner(strbuf);
 

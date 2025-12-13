@@ -344,7 +344,9 @@ int VideoStreamIGTLinkReceiver::ParseConfigForClient()
       if (strTag[0].compare ("TCPServerIPAddress") == 0) {
         this->TCPServerIPAddress = new char[IP4AddressStrLen];
         memcpy(this->TCPServerIPAddress, strTag[1].c_str(), IP4AddressStrLen);
-        if(!inet_addr(this->TCPServerIPAddress))
+        // Use inet_pton() instead of deprecated inet_addr()
+        struct in_addr addr;
+        if(inet_pton(AF_INET, this->TCPServerIPAddress, &addr) != 1)
           {
           fprintf (stderr, "Invalid parameter for IP address");
           return 1;

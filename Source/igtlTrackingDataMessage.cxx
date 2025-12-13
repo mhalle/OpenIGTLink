@@ -212,7 +212,7 @@ int StartTrackingDataMessage::UnpackContent()
   this->m_Resolution = stt_tdata->resolution;
     
   char strbuf[IGTL_STT_TDATA_LEN_COORDNAME+1];
-  strbuf[IGTL_STT_TDATA_LEN_COORDNAME] = '\n';
+  strbuf[IGTL_STT_TDATA_LEN_COORDNAME] = '\0';
   strncpy(strbuf, stt_tdata->coord_name, IGTL_STT_TDATA_LEN_COORDNAME);
     
   this->SetCoordinateName(strbuf);
@@ -359,9 +359,9 @@ int TrackingDataMessage::UnpackContent()
     {
     TrackingDataElement::Pointer elemClass = TrackingDataElement::New();
       
-    // Add '\n' at the end of each string
-    // (neccesary for a case, where a string reaches the maximum length.)
-    strbuf[IGTL_TDATA_LEN_NAME] = '\n';
+    // Add null terminator at the end of each string
+    // (necessary for a case, where a string reaches the maximum length.)
+    strbuf[IGTL_TDATA_LEN_NAME] = '\0';
     strncpy(strbuf, (char*)element->name, IGTL_TDATA_LEN_NAME);
     elemClass->SetName((const char*)strbuf);
     elemClass->SetType(element->type);

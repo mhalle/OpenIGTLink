@@ -211,7 +211,7 @@ int StartQuaternionTrackingDataMessage::UnpackContent()
   this->m_Resolution = stt_qtdata->resolution;
 
   char strbuf[IGTL_STT_QTDATA_LEN_COORDNAME+1];
-  strbuf[IGTL_STT_QTDATA_LEN_COORDNAME] = '\n';
+  strbuf[IGTL_STT_QTDATA_LEN_COORDNAME] = '\0';
   strncpy(strbuf, stt_qtdata->coord_name, IGTL_STT_QTDATA_LEN_COORDNAME);
 
   this->SetCoordinateName(strbuf);
@@ -370,9 +370,9 @@ int QuaternionTrackingDataMessage::UnpackContent()
     {
     QuaternionTrackingDataElement::Pointer elemClass = QuaternionTrackingDataElement::New();
 
-    // Add '\n' at the end of each string
+    // Add null terminator at the end of each string
     // (necessary for a case, where a string reaches the maximum length.)
-    strbuf[IGTL_QTDATA_LEN_NAME] = '\n';
+    strbuf[IGTL_QTDATA_LEN_NAME] = '\0';
     strncpy(strbuf, (char*)element->name, IGTL_QTDATA_LEN_NAME);
     elemClass->SetName((const char*)strbuf);
     elemClass->SetType(element->type);
