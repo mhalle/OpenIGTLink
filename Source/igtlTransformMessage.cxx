@@ -232,8 +232,16 @@ int TransformMessage::PackContent()
   
 int TransformMessage::UnpackContent()
 {
+  /* Security: Validate content size before copying transform data */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_TRANSFORM_SIZE)
+    {
+    return 0;
+    }
+
   this->m_Transform = this->m_Content;
-    
+
   //igtl_float32* transform = (igtl_float32*)this->m_Transform;  // doesn't work on Solaris
   igtl_float32 transform[12];
 #if OpenIGTLink_HEADER_VERSION >= 2

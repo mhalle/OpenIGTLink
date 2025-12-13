@@ -158,13 +158,30 @@ int SensorMessage::PackContent()
 
 int SensorMessage::UnpackContent()
 {
+  /* Security: Validate content size before accessing struct fields */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < sizeof(igtl_sensor_header))
+    {
+    return 0;
+    }
+
   // Set pointers
   igtl_sensor_header * sensor_header;
   igtl_float64       * data;
   sensor_header = (igtl_sensor_header *) (this->m_Content);
   data = (igtl_float64 *) (this->m_Content + sizeof(igtl_sensor_header));
 
-  // Convert byte order from local to network  
+  /* Security: Validate data array fits in received content.
+   * larray is 8-bit and doesn't need byte swapping, so we can read it directly. */
+  igtlUint8 larray = sensor_header->larray;
+  igtlUint64 requiredDataSize = (igtlUint64)larray * sizeof(igtl_float64);
+  if (contentSize < sizeof(igtl_sensor_header) + requiredDataSize)
+    {
+    return 0;
+    }
+
+  // Convert byte order from local to network
   igtl_sensor_convert_byte_order(sensor_header, data);
 
   // Copy data

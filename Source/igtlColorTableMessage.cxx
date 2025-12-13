@@ -88,11 +88,29 @@ int ColorTableMessage::PackContent()
 
 int ColorTableMessage::UnpackContent()
 {
+  /* Security: Validate content size before accessing header */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_COLORTABLE_HEADER_SIZE)
+    {
+    return 0;
+    }
 
   this->m_ColorTableHeader = this->m_Content;
   this->m_ColorTable       = &(this->m_Content[IGTL_COLORTABLE_HEADER_SIZE]);
 
   igtl_colortable_header* colortable_header = (igtl_colortable_header*)this->m_ColorTableHeader;
+
+  /* Security: Validate table size fits in received content before byte order conversion.
+   * Note: igtl_colortable_get_table_size() is called before igtl_colortable_convert_byte_order()
+   * but this is safe because indexType and mapType are uint8 fields that don't require
+   * byte swapping - they have the same value in network and host order. */
+  igtlUint64 tableSize = igtl_colortable_get_table_size(colortable_header);
+  if (contentSize < IGTL_COLORTABLE_HEADER_SIZE + tableSize)
+    {
+    return 0;
+    }
+
   igtl_colortable_convert_byte_order(colortable_header, (void*)this->m_ColorTable);
 
   this->indexType = colortable_header->indexType;

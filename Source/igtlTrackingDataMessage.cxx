@@ -204,21 +204,29 @@ int StartTrackingDataMessage::PackContent()
   
 int StartTrackingDataMessage::UnpackContent()
 {
+  /* Security: Validate content size before accessing struct fields */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_STT_TDATA_SIZE)
+    {
+    return 0;
+    }
+
   igtl_stt_tdata* stt_tdata = NULL;
   stt_tdata = (igtl_stt_tdata*)(this->m_Content);
-    
+
   igtl_stt_tdata_convert_byte_order(stt_tdata);
-    
+
   this->m_Resolution = stt_tdata->resolution;
-    
+
   char strbuf[IGTL_STT_TDATA_LEN_COORDNAME+1];
   strbuf[IGTL_STT_TDATA_LEN_COORDNAME] = '\0';
   strncpy(strbuf, stt_tdata->coord_name, IGTL_STT_TDATA_LEN_COORDNAME);
-    
+
   this->SetCoordinateName(strbuf);
-    
+
   return 1;
-    
+
 }
   
   
@@ -246,13 +254,21 @@ int  RTSTrackingDataMessage::PackContent()
   
 int  RTSTrackingDataMessage::UnpackContent()
 {
+  /* Security: Validate content size before accessing struct fields */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_RTS_TDATA_SIZE)
+    {
+    return 0;
+    }
+
   igtl_rts_tdata* rts_tdata = NULL;
   rts_tdata = (igtl_rts_tdata*)this->m_Content;
-    
+
   igtl_rts_tdata_convert_byte_order(rts_tdata);
-    
+
   this->m_Status= rts_tdata->status;
-    
+
   return 1;
 }
   
