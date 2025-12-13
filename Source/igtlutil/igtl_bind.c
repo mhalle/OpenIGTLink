@@ -204,21 +204,38 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info, igtl_uint6
         {
         break;  /* No more names in table */
         }
-      strncpy(info->child_info_array[i].name, ptr, IGTL_HEADER_NAME_SIZE);
-      info->child_info_array[i].name[IGTL_HEADER_NAME_SIZE] = '\0';
-      namelen = strlen(info->child_info_array[i].name);
-      ptr += namelen + 1;
+      /* Security: Find NUL terminator within remaining buffer bounds using memchr */
+      size_t remaining = (size_t)(nametable_end - ptr);
+      char * nul_pos = (char *)memchr(ptr, '\0', remaining);
+      if (nul_pos == NULL)
+        {
+        /* No NUL terminator found within bounds - malformed name table */
+        return 0;
+        }
+      namelen = (size_t)(nul_pos - ptr);
+      /* Copy name safely - limit to both available length and max name size */
+      size_t copy_len = (namelen < IGTL_HEADER_NAME_SIZE) ? namelen : IGTL_HEADER_NAME_SIZE;
+      memcpy(info->child_info_array[i].name, ptr, copy_len);
+      info->child_info_array[i].name[copy_len] = '\0';
+      ptr += namelen + 1;  /* Advance past string and its NUL terminator */
       }
     }
 
   ptr = ptr2 + nametable_size;
 
-  /* Security: Calculate total size of child message bodies */
+  /* Security: Calculate total size of child message bodies with overflow check */
   total_child_size = 0;
   for (i = 0; i < ncmessages; i ++)
     {
     /* Include padding for odd-sized messages */
-    total_child_size += info->child_info_array[i].size + (info->child_info_array[i].size % 2);
+    igtl_uint64 child_size_padded = info->child_info_array[i].size + (info->child_info_array[i].size % 2);
+    /* Security: Check for overflow in addition */
+    if (child_size_padded < info->child_info_array[i].size ||
+        total_child_size > (~(igtl_uint64)0) - child_size_padded)
+      {
+      return 0;  /* Overflow would occur */
+      }
+    total_child_size += child_size_padded;
     }
 
   /* Security: Validate child bodies fit in buffer */
@@ -354,10 +371,20 @@ int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint
         {
         break;  /* No more names in table */
         }
-      strncpy(info->child_info_array[i].name, ptr, IGTL_HEADER_NAME_SIZE);
-      info->child_info_array[i].name[IGTL_HEADER_NAME_SIZE] = '\0';
-      namelen = strlen(info->child_info_array[i].name);
-      ptr += namelen + 1;
+      /* Security: Find NUL terminator within remaining buffer bounds using memchr */
+      size_t remaining = (size_t)(nametable_end - ptr);
+      char * nul_pos = (char *)memchr(ptr, '\0', remaining);
+      if (nul_pos == NULL)
+        {
+        /* No NUL terminator found within bounds - malformed name table */
+        return 0;
+        }
+      namelen = (size_t)(nul_pos - ptr);
+      /* Copy name safely - limit to both available length and max name size */
+      size_t copy_len = (namelen < IGTL_HEADER_NAME_SIZE) ? namelen : IGTL_HEADER_NAME_SIZE;
+      memcpy(info->child_info_array[i].name, ptr, copy_len);
+      info->child_info_array[i].name[copy_len] = '\0';
+      ptr += namelen + 1;  /* Advance past string and its NUL terminator */
       }
     }
 
