@@ -63,7 +63,9 @@ namespace igtl {
     igtl_stt_video_convert_byte_order(stt_video);
 
     this->m_TimeInterval = stt_video->time_interval;
-    this->m_CodecType = std::string(stt_video->codec);
+    /* Security: codec is a fixed 4-byte array without null terminator.
+       Use explicit length to avoid reading past the buffer. */
+    this->m_CodecType.assign(stt_video->codec, IGTL_VIDEO_CODEC_NAME_SIZE);
     return 1;
   }
   
