@@ -267,11 +267,10 @@ int PointMessage::UnpackContent()
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2
   element = (igtl_point_element*) (this->m_Content);
-  nElement = igtl_point_get_data_n(contentSize);
 #elif OpenIGTLink_PROTOCOL_VERSION <=2
   element = (igtl_point_element*) this->m_Body;
-  nElement = igtl_point_get_data_n(this->m_BodySizeToRead);
 #endif
+  nElement = igtl_point_get_data_n(contentSize);
 
   igtl_point_convert_byte_order(element, nElement);
   

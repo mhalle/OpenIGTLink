@@ -362,15 +362,16 @@ int VideoMetaMessage::UnpackContent()
 
   this->m_VideoMetaList.clear();
 
-  igtl_videometa_element* element = (igtl_videometa_element*) this->m_Content;
-  int elementsDataLength = this->m_BodySizeToRead;
-#if OpenIGTLink_HEADER_VERSION >= 2
-  if (m_HeaderVersion == IGTL_HEADER_VERSION_2)
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
     {
-    elementsDataLength = this->m_BodySizeToRead-IGTL_EXTENDED_HEADER_SIZE-this->GetMetaDataHeaderSize()-this->GetMetaDataSize();
+    return 0;
     }
-#endif
-  int nElement = igtl_videometa_get_data_n(elementsDataLength);
+
+  igtl_videometa_element* element = (igtl_videometa_element*) this->m_Content;
+  int nElement = igtl_videometa_get_data_n(contentSize);
 
   igtl_videometa_convert_byte_order(element, nElement);
   

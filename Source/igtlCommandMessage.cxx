@@ -198,6 +198,14 @@ int CommandMessage::PackContent()
 
 int CommandMessage::UnpackContent()
 {
+  // Security: Validate content size BEFORE accessing header
+  bool isUnpacked = true;
+  igtl_uint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < sizeof(igtl_command_header))
+    {
+    return 0;  // Content too small to contain header
+    }
+
   igtl_command_header * command_header;
   char * command;
 
@@ -211,14 +219,6 @@ int CommandMessage::UnpackContent()
 
   // Convert byte order from network to host
   igtl_command_convert_byte_order(command_header);
-
-  // Security: Validate that claimed length fits within actual received content
-  bool isUnpacked = true;
-  igtl_uint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
-  if (contentSize < sizeof(igtl_command_header))
-    {
-    return 0;  // Content too small to contain header
-    }
   igtl_uint64 maxCommandLength = contentSize - sizeof(igtl_command_header);
   igtl_uint32 safeLength = command_header->length;
   if (safeLength > maxCommandLength)

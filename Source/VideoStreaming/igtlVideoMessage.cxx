@@ -50,10 +50,18 @@ namespace igtl {
   
   int StartVideoMessage::UnpackContent()
   {
+    /* Security: Validate content size before accessing struct fields */
+    bool isUnpacked(true);
+    igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+    if (!isUnpacked || contentSize < IGTL_STT_VIDEO_SIZE)
+      {
+      return 0;
+      }
+
     igtl_stt_video* stt_video = (igtl_stt_video*)this->m_Content;
-    
+
     igtl_stt_video_convert_byte_order(stt_video);
-    
+
     this->m_TimeInterval = stt_video->time_interval;
     this->m_CodecType = std::string(stt_video->codec);
     return 1;
@@ -253,6 +261,14 @@ namespace igtl {
   
   int VideoMessage::UnpackContent()
   {
+    /* Security: Validate content size before accessing header */
+    bool isUnpacked(true);
+    igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+    if (!isUnpacked || contentSize < IGTL_VIDEO_HEADER_SIZE)
+      {
+      return 0;
+      }
+
   #if OpenIGTLink_HEADER_VERSION >= 2
     if (m_HeaderVersion == IGTL_HEADER_VERSION_2)
       {
@@ -267,7 +283,7 @@ namespace igtl {
     this->m_FrameHeader = m_Body;
     this->m_Frame = m_Body;
   #endif
-    
+
     igtl_frame_header* frame_header = (igtl_frame_header*)m_FrameHeader;
     igtl_frame_convert_byte_order(frame_header);
     

@@ -804,11 +804,16 @@ int PolyDataMessage::UnpackContent()
   igtl_polydata_info info;
 
   igtl_polydata_init_info(&info);
-  
-  int r = 0;
 
+  /* Security: Validate content size is available */
   bool isUnpacked(true);
-  r = igtl_polydata_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &info, this->CalculateReceiveContentSize(isUnpacked));
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
+  int r = igtl_polydata_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &info, contentSize);
 
   if ( r == 0)
     {

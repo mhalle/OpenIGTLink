@@ -256,10 +256,17 @@ int BindMessage::PackContent()
 
 int BindMessage::UnpackContent()
 {
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
 
   igtl_bind_info bind_info;
 
-  if (igtl_bind_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &bind_info, this->GetBufferBodySize()) == 0)
+  if (igtl_bind_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &bind_info, contentSize) == 0)
     {
     return 0;
     }
@@ -369,10 +376,17 @@ int GetBindMessage::PackContent()
 
 int GetBindMessage::UnpackContent()
 {
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
 
   igtl_bind_info bind_info;
 
-  if (igtl_bind_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &bind_info, this->GetBufferBodySize()) == 0)
+  if (igtl_bind_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &bind_info, contentSize) == 0)
     {
     return 0;
     }
@@ -482,10 +496,17 @@ int StartBindMessage::PackContent()
 
 int StartBindMessage::UnpackContent()
 {
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
 
   igtl_bind_info bind_info;
 
-  if (igtl_bind_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &bind_info, this->GetBufferBodySize()) == 0)
+  if (igtl_bind_unpack(IGTL_TYPE_PREFIX_NONE, (void*)this->m_Content, &bind_info, contentSize) == 0)
     {
     return 0;
     }
