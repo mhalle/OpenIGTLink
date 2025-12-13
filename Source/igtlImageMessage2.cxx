@@ -605,6 +605,14 @@ int ImageMessage2::PackContent()
 
 int ImageMessage2::UnpackContent()
 {
+  /* Security: Validate content size before accessing header */
+  bool isUnpacked = true;
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_IMAGE_HEADER_SIZE)
+    {
+    return 0;
+    }
+
   if (this->m_ImageHeader && this->m_SelfAllocatedImageHeader)
     {
     delete [] this->m_ImageHeader;
@@ -620,6 +628,13 @@ int ImageMessage2::UnpackContent()
 
   igtl_image_header* image_header = (igtl_image_header*)m_ImageHeader;
   igtl_image_convert_byte_order(image_header);
+
+  /* Security: Validate pixel data fits in received content */
+  igtlUint64 imageDataSize = igtl_image_get_data_size(image_header);
+  if (contentSize < IGTL_IMAGE_HEADER_SIZE + imageDataSize)
+    {
+    return 0;
+    }
 
   if (image_header->header_version == IGTL_IMAGE_HEADER_VERSION)
     {
