@@ -812,9 +812,10 @@ int PolyDataMessage::UnpackContent()
 
   if ( r == 0)
     {
+    igtl_polydata_free_info(&info);
     return 0;
     }
-  
+
   // Points
   if (this->m_Points.IsNull())
     {
@@ -831,6 +832,8 @@ int PolyDataMessage::UnpackContent()
     }
 
   igtlUint32 * ptr;
+  igtlUint32 * ptr_end;
+  unsigned int remaining;
 
   // Vertices
   if (this->m_Vertices.IsNull())
@@ -839,10 +842,25 @@ int PolyDataMessage::UnpackContent()
     }
   this->m_Vertices->Clear();
   ptr = info.vertices;
+  // Security: Calculate end pointer based on size_vertices (in bytes, divide by 4 for uint32 count)
+  remaining = info.header.size_vertices / sizeof(igtlUint32);
+  ptr_end = ptr + remaining;
   for (unsigned int i = 0; i < info.header.nvertices; i ++)
     {
+    // Security: Check we have at least 1 element for the count
+    if (ptr >= ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     unsigned int n = *ptr;
     ptr ++;
+    // Security: Check we have n elements for the cell data
+    if (ptr + n > ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     this->m_Vertices->AddCell(n, ptr);
     ptr += n;
     }
@@ -854,10 +872,22 @@ int PolyDataMessage::UnpackContent()
     }
   this->m_Lines->Clear();
   ptr = info.lines;
+  remaining = info.header.size_lines / sizeof(igtlUint32);
+  ptr_end = ptr + remaining;
   for (unsigned int i = 0; i < info.header.nlines; i ++)
     {
+    if (ptr >= ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     unsigned int n = *ptr;
     ptr ++;
+    if (ptr + n > ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     this->m_Lines->AddCell(n, ptr);
     ptr += n;
     }
@@ -869,10 +899,22 @@ int PolyDataMessage::UnpackContent()
     }
   this->m_Polygons->Clear();
   ptr = info.polygons;
+  remaining = info.header.size_polygons / sizeof(igtlUint32);
+  ptr_end = ptr + remaining;
   for (unsigned int i = 0; i < info.header.npolygons; i ++)
     {
+    if (ptr >= ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     unsigned int n = *ptr;
     ptr ++;
+    if (ptr + n > ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     this->m_Polygons->AddCell(n, ptr);
     ptr += n;
     }
@@ -884,10 +926,22 @@ int PolyDataMessage::UnpackContent()
     }
   this->m_TriangleStrips->Clear();
   ptr = info.triangle_strips;
+  remaining = info.header.size_triangle_strips / sizeof(igtlUint32);
+  ptr_end = ptr + remaining;
   for (unsigned int i = 0; i < info.header.ntriangle_strips; i ++)
     {
+    if (ptr >= ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     unsigned int n = *ptr;
     ptr ++;
+    if (ptr + n > ptr_end)
+      {
+      igtl_polydata_free_info(&info);
+      return 0;
+      }
     this->m_TriangleStrips->AddCell(n, ptr);
     ptr += n;
     }
@@ -912,7 +966,7 @@ int PolyDataMessage::UnpackContent()
       }
     }
 
-
+  igtl_polydata_free_info(&info);
   return 1;
 }
 
