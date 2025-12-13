@@ -116,9 +116,18 @@ int StringMessage::PackContent()
 
 int StringMessage::UnpackContent()
 {
+  const size_t headerSize = sizeof(igtlUint16)*2;  // encoding + length fields
+
+  // Security: Validate content size before accessing any fields
+  bool isUnpacked = true;
+  igtl_uint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < headerSize)
+    {
+    return 0;  // Content too small to contain header
+    }
+
   igtl_string_header * string_header;
   char * string;
-  const size_t headerSize = sizeof(igtlUint16)*2;  // encoding + length fields
 #if OpenIGTLink_HEADER_VERSION >= 2
   string_header = (igtl_string_header*) (this->m_Content);
   string        = (char *) this->m_Content + headerSize;
@@ -131,12 +140,6 @@ int StringMessage::UnpackContent()
   igtl_string_convert_byte_order(string_header);
 
   // Security: Validate that claimed length fits within actual received content
-  bool isUnpacked = true;
-  igtl_uint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
-  if (contentSize < headerSize)
-    {
-    return 0;  // Content too small to contain header
-    }
   igtl_uint64 maxStringLength = contentSize - headerSize;
   igtl_uint16 safeLength = string_header->length;
   if (safeLength > maxStringLength)
