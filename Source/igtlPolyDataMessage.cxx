@@ -1100,6 +1100,14 @@ int RTSPolyDataMessage::PackContent()
 
 int RTSPolyDataMessage::UnpackContent()
 {
+  /* Security: Validate content size before reading status byte */
+  bool isUnpacked = true;
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < sizeof(igtl_uint8))
+    {
+    return 0;
+    }
+
   igtl_uint8* content;
 
 #if OpenIGTLink_HEADER_VERSION >= 2
