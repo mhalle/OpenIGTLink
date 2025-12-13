@@ -118,9 +118,17 @@ int QueryMessage::PackContent()
 
 int QueryMessage::UnpackContent()
 {
+  /* Security: Validate content size before accessing header */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_QUERY_HEADER_SIZE)
+    {
+    return 0;
+    }
+
   igtl_query_header * query_header;
   char * deviceName;
-  
+
 #if OpenIGTLink_HEADER_VERSION >= 2
   query_header = (igtl_query_header*) this->m_Content;
   deviceName        = (char *) this->m_Content + sizeof(igtl_query_header);
@@ -128,16 +136,23 @@ int QueryMessage::UnpackContent()
   query_header = (igtl_query_header*) this->m_Body;
   deviceName        = (char *) this->m_Body + sizeof(igtl_query_header);
 #endif
-  
+
   // Convert byte order from network to host
   igtl_query_convert_byte_order(query_header);
-  
+
+  /* Security: Validate advertised UID length fits in the received payload */
+  igtlUint16 uidLength = query_header->deviceUIDLength;
+  if (contentSize < IGTL_QUERY_HEADER_SIZE + uidLength)
+    {
+    return 0;
+    }
+
   // Copy data
   this->m_QueryID = query_header->queryID;
   memcpy(m_DataType, query_header->queryDataType, IGTL_QUERY_DATE_TYPE_SIZE);
   this->m_DeviceUID.clear();
-  this->m_DeviceUID.append(deviceName, query_header->deviceUIDLength);
-  
+  this->m_DeviceUID.append(deviceName, uidLength);
+
   return 1;
 }
 
