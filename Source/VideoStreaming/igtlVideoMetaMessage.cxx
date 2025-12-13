@@ -370,6 +370,12 @@ int VideoMetaMessage::UnpackContent()
     return 0;
     }
 
+  /* Security: Reject malformed data with partial elements */
+  if (contentSize % IGTL_VIDEOMETA_ELEMENT_SIZE != 0)
+    {
+    return 0;
+    }
+
   igtl_videometa_element* element = (igtl_videometa_element*) this->m_Content;
   int nElement = igtl_videometa_get_data_n(contentSize);
 

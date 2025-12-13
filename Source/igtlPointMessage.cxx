@@ -263,6 +263,12 @@ int PointMessage::UnpackContent()
     return 0;
     }
 
+  /* Security: Reject malformed data with partial elements */
+  if (contentSize % IGTL_POINT_ELEMENT_SIZE != 0)
+    {
+    return 0;
+    }
+
   igtl_point_element* element = NULL;
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2

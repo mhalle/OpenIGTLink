@@ -328,6 +328,12 @@ int TrajectoryMessage::UnpackContent()
     return 0;
     }
 
+  /* Security: Reject malformed data with partial elements */
+  if (contentSize % IGTL_TRAJECTORY_ELEMENT_SIZE != 0)
+    {
+    return 0;
+    }
+
   igtl_trajectory_element* element = NULL;
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2

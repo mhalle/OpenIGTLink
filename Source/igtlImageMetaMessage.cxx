@@ -292,6 +292,12 @@ int ImageMetaMessage::UnpackContent()
     return 0;
     }
 
+  /* Security: Reject malformed data with partial elements */
+  if (contentSize % IGTL_IMGMETA_ELEMENT_SIZE != 0)
+    {
+    return 0;
+    }
+
   igtl_imgmeta_element* element = (igtl_imgmeta_element*) this->m_Content;
   int nElement = igtl_imgmeta_get_data_n(contentSize);
 

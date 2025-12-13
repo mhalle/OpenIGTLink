@@ -377,6 +377,12 @@ int QuaternionTrackingDataMessage::UnpackContent()
     return 0;
     }
 
+  /* Security: Reject malformed data with partial elements */
+  if (contentSize % IGTL_QTDATA_ELEMENT_SIZE != 0)
+    {
+    return 0;
+    }
+
   igtl_qtdata_element* element = NULL;
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2
