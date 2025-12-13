@@ -303,10 +303,12 @@ int igtl_polydata_convert_byteorder_topology(igtl_uint32 * dst, igtl_uint32 * sr
 
 int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_info * info, igtl_uint64 size)
 {
-  /* size = number of points (not number of bytes). In case of vertices, this is specified 
+  /* size = number of points (not number of bytes). In case of vertices, this is specified
      by size_vertices in igtl_polydata_header. */
   igtl_polydata_header * header;
   char * ptr;
+  igtl_uint64 remaining;
+  size_t points_size;
 
   igtl_uint32 * ptr32_src;
   igtl_uint32 * ptr32_src_end;
@@ -328,6 +330,14 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
     return 0;
     }
 
+  /* Security: Validate minimum size for header */
+  if (size < sizeof(igtl_polydata_header))
+    {
+    return 0;
+    }
+
+  remaining = size - sizeof(igtl_polydata_header);
+
   /* POLYDATA header */
   header = (igtl_polydata_header *) byte_array;
   if (igtl_is_little_endian())
@@ -347,7 +357,29 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
     {
     memcpy(&(info->header), header, sizeof(igtl_polydata_header));
     }
-  
+
+  /* Security: Calculate and validate points section size */
+  if (!igtl_polydata_safe_multiply((size_t)info->header.npoints, sizeof(igtl_float32) * 3, &points_size))
+    {
+    return 0;  /* Overflow */
+    }
+  if (remaining < points_size)
+    {
+    return 0;  /* Buffer too small for points */
+    }
+
+  /* Security: Validate topology section sizes fit in remaining buffer */
+  {
+    igtl_uint64 topology_total = (igtl_uint64)info->header.size_vertices +
+                                  (igtl_uint64)info->header.size_lines +
+                                  (igtl_uint64)info->header.size_polygons +
+                                  (igtl_uint64)info->header.size_triangle_strips;
+    if (remaining < points_size + topology_total)
+      {
+      return 0;  /* Buffer too small for topology sections */
+      }
+  }
+
   /* Allocate memory to read data */
   /* TODO: compare the size of info before copying the header. */
   /* If the size doesn't change, avoid reallocation of memory. */
@@ -355,14 +387,14 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
     {
     return 0;
     }
-  
+
   /* POINT section */
   ptr = (char*) byte_array + sizeof(igtl_polydata_header);
   if (!igtl_is_little_endian())
     {
-    memcpy(info->points, ptr, sizeof(igtl_float32)*info->header.npoints*3);
+    memcpy(info->points, ptr, points_size);
     }
-  else 
+  else
     {
     ptr32_src = (igtl_uint32 *) ptr;
     ptr32_src_end = ptr32_src + info->header.npoints*3;
@@ -375,7 +407,8 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
       }
     }
 
-  ptr += sizeof(igtl_float32)*info->header.npoints*3;
+  ptr += points_size;
+  remaining -= points_size;
 
   /* Check size parameters */
   if (info->header.size_vertices%sizeof(igtl_uint32) != 0 ||
@@ -390,18 +423,35 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
   /* VERTICES section */
   igtl_polydata_convert_byteorder_topology(info->vertices, (igtl_uint32*)ptr, info->header.size_vertices);
   ptr += info->header.size_vertices;
+  remaining -= info->header.size_vertices;
 
   /* LINES section */
   igtl_polydata_convert_byteorder_topology(info->lines, (igtl_uint32*)ptr, info->header.size_lines);
   ptr += info->header.size_lines;
+  remaining -= info->header.size_lines;
 
   /* POLYGONS section */
   igtl_polydata_convert_byteorder_topology(info->polygons, (igtl_uint32*)ptr, info->header.size_polygons);
   ptr += info->header.size_polygons;
+  remaining -= info->header.size_polygons;
 
   /* TRIANGLE_STRIPS section */
   igtl_polydata_convert_byteorder_topology(info->triangle_strips, (igtl_uint32*)ptr, info->header.size_triangle_strips);
   ptr += info->header.size_triangle_strips;
+  remaining -= info->header.size_triangle_strips;
+
+  /* Security: Validate attribute headers fit in remaining buffer */
+  {
+    size_t attr_headers_size;
+    if (!igtl_polydata_safe_multiply(info->header.nattributes, sizeof(igtl_polydata_attribute_header), &attr_headers_size))
+      {
+      return 0;  /* Overflow */
+      }
+    if (remaining < attr_headers_size)
+      {
+      return 0;  /* Buffer too small for attribute headers */
+      }
+  }
 
   /* Attribute header */
   for (i = 0; i < info->header.nattributes; i ++)
@@ -419,37 +469,48 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
       att->n = att_header->n;
       }
     ptr += sizeof(igtl_polydata_attribute_header);
+    remaining -= sizeof(igtl_polydata_attribute_header);
     }
-  
+
   /* Attribute names */
   total_name_length = 0;
   name_buf[IGTL_POLY_MAX_ATTR_NAME_LEN] = '\0';
   for (i = 0; i < info->header.nattributes; i ++)
     {
-    name_length = strlen(ptr);
-    if (name_length <= IGTL_POLY_MAX_ATTR_NAME_LEN)
+    /* Security: Use memchr for bounded string search instead of strlen */
+    char * nul_pos = (char *)memchr(ptr, '\0', (size_t)remaining);
+    if (nul_pos == NULL)
       {
-      info->attributes[i].name = malloc(name_length+1);
-      if (info->attributes[i].name == NULL)
-        {
-        return 0;  /* allocation failed */
-        }
-      strncpy(info->attributes[i].name, ptr, name_length);
-      info->attributes[i].name[name_length] = '\0';
+      /* No NUL terminator found within buffer bounds */
+      return 0;
       }
-    else
+    name_length = (int)(nul_pos - ptr);
+    if (name_length > IGTL_POLY_MAX_ATTR_NAME_LEN)
       {
       /* invalid name length */
       return 0;
       }
+    info->attributes[i].name = malloc(name_length+1);
+    if (info->attributes[i].name == NULL)
+      {
+      return 0;  /* allocation failed */
+      }
+    memcpy(info->attributes[i].name, ptr, name_length);
+    info->attributes[i].name[name_length] = '\0';
     total_name_length += (name_length+1);
     ptr += (name_length+1);
+    remaining -= (name_length+1);
     }
 
   if (total_name_length % 2 > 0)
     {
     /* add padding */
+    if (remaining < 1)
+      {
+      return 0;  /* Buffer too small for padding */
+      }
     ptr ++;
+    remaining --;
     }
 
   /* Attributes */
@@ -499,6 +560,11 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
       {
       return 0;  /* Overflow */
       }
+    /* Security: Validate attribute data fits in remaining buffer */
+    if (remaining < attr_alloc_size)
+      {
+      return 0;  /* Buffer too small for attribute data */
+      }
     s = (igtl_uint32)attr_alloc_size;
     info->attributes[i].data = (igtl_float32*)malloc(attr_alloc_size);
     if (info->attributes[i].data == NULL)
@@ -522,8 +588,9 @@ int igtl_export igtl_polydata_unpack(int type, void * byte_array, igtl_polydata_
       memcpy(ptr32_dst, ptr32_src, s);
       }
     ptr += s;
+    remaining -= s;
     }
-  
+
   return 1;
 }
 
