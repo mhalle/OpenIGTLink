@@ -463,6 +463,16 @@ bool MessageBase::UnpackMetaData()
 {
   if (m_HeaderVersion == IGTL_HEADER_VERSION_2)
     {
+    const igtl_uint16 metaDataHeaderSize = ((igtl_extended_header*)m_ExtendedHeader)->meta_data_header_size;
+    // Security: Use correct type (igtl_uint32, not igtl_uint16) to avoid truncation
+    const igtl_uint32 metaDataSize = ((igtl_extended_header*)m_ExtendedHeader)->meta_data_size;
+
+    // Security: Validate metaDataHeaderSize is large enough for index_count
+    if (metaDataHeaderSize < META_DATA_INDEX_COUNT_SIZE)
+      {
+      return false;
+      }
+
     // Parse the header
     igtl_uint16 index_count = 0; // first two byte are the total number of meta data
     memcpy(&index_count, m_MetaDataHeader, META_DATA_INDEX_COUNT_SIZE);
@@ -476,18 +486,25 @@ bool MessageBase::UnpackMetaData()
       return true;
       }
 
+    // Security: Validate that header can hold all declared entries
+    igtl_uint32 requiredHeaderSize = META_DATA_INDEX_COUNT_SIZE +
+                                     (igtl_uint32)index_count * sizeof(igtl_metadata_header_entry);
+    if (requiredHeaderSize > metaDataHeaderSize)
+      {
+      return false;
+      }
+
     std::vector<igtl_metadata_header_entry> metaDataEntries;
     igtl_metadata_header_entry entry;
     unsigned char* entryPointer = &m_MetaDataHeader[META_DATA_INDEX_COUNT_SIZE];
-    const igtl_uint16 metaDataHeaderSize = ((igtl_extended_header*)m_ExtendedHeader)->meta_data_header_size;
     igtl_uint32 currentMetaDataHeaderRead = 0;
     for (int i = 0; i < index_count; i++)
       {
       currentMetaDataHeaderRead += sizeof(igtl_metadata_header_entry);
       if (currentMetaDataHeaderRead > metaDataHeaderSize)
-      {
+        {
         return false;
-      }
+        }
 
       memcpy(&entry.key_size, &entryPointer[0], sizeof(igtlUint16));
       memcpy(&entry.value_encoding, &entryPointer[2], sizeof(igtlUint16));
@@ -507,15 +524,17 @@ bool MessageBase::UnpackMetaData()
     m_MetaDataMap.clear();
 
     unsigned char* metaDataPointer = m_MetaData;
-    const igtl_uint16 metaDataSize = ((igtl_extended_header*)m_ExtendedHeader)->meta_data_size;
     igtl_uint32 currentMetaDataRead = 0;
     for (int i = 0; i < index_count; i++)
       {
-      currentMetaDataRead += metaDataEntries[i].key_size + metaDataEntries[i].value_size;
-      if (currentMetaDataRead > metaDataSize)
-      {
+      // Security: Check for integer overflow using 64-bit arithmetic
+      igtl_uint64 entrySize = (igtl_uint64)metaDataEntries[i].key_size + metaDataEntries[i].value_size;
+      if (entrySize > metaDataSize - currentMetaDataRead)
+        {
         return false;
-      }
+        }
+      currentMetaDataRead += static_cast<igtl_uint32>(entrySize);
+
       std::string key;
       key.assign(metaDataPointer, metaDataPointer + metaDataEntries[i].key_size);
       metaDataPointer += metaDataEntries[i].key_size;
