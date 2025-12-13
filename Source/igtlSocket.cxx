@@ -621,12 +621,13 @@ int Socket::GetSocketAddressAndPort(std::string& address, int& port)
     {
     return 0;
     }
-  const char* a = inet_ntoa(sockinfo.sin_addr);
-  if ( a == NULL )
+  // Use inet_ntop() instead of deprecated inet_ntoa() (thread-safe)
+  char addrBuf[INET_ADDRSTRLEN];
+  if (inet_ntop(AF_INET, &sockinfo.sin_addr, addrBuf, sizeof(addrBuf)) == NULL)
     {
     return 0;
     }
-  address = a;
+  address = addrBuf;
   port = ntohs(sockinfo.sin_port);
 
   return 1;
