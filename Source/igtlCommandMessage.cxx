@@ -211,13 +211,27 @@ int CommandMessage::UnpackContent()
 
   // Convert byte order from network to host
   igtl_command_convert_byte_order(command_header);
-  
+
+  // Security: Validate that claimed length fits within actual received content
+  bool isUnpacked = true;
+  igtl_uint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (contentSize < sizeof(igtl_command_header))
+    {
+    return 0;  // Content too small to contain header
+    }
+  igtl_uint64 maxCommandLength = contentSize - sizeof(igtl_command_header);
+  igtl_uint32 safeLength = command_header->length;
+  if (safeLength > maxCommandLength)
+    {
+    safeLength = static_cast<igtl_uint32>(maxCommandLength);
+    }
+
   // Copy data
   this->m_CommandId = command_header->commandId;
   memcpy(m_CommandName, command_header->commandName, IGTL_COMMAND_NAME_SIZE);
   this->m_Encoding = command_header->encoding;
   this->m_Command.clear();
-  this->m_Command.append(command, command_header->length);
+  this->m_Command.append(command, safeLength);
 
   return 1;
 }

@@ -67,9 +67,18 @@ int igtl_export igtl_ndarray_alloc_info(igtl_ndarray_info * info, const igtl_uin
 {
   int i;
   igtl_uint64 len;
+  igtl_uint32 element_size;
+  igtl_uint64 array_size;
+  const igtl_uint64 maxVal = ~(igtl_uint64)0;
 
   if (info->size == NULL && info->array == NULL)
     {
+    /* Security: Validate dimension is reasonable (max 255 dimensions) */
+    if (info->dim == 0 || info->dim > 255)
+      {
+      return 0;
+      }
+
     info->size = malloc(sizeof(igtl_uint16) * (igtl_uint16) info->dim);
     if (info->size == NULL)
       {
@@ -80,14 +89,39 @@ int igtl_export igtl_ndarray_alloc_info(igtl_ndarray_info * info, const igtl_uin
     for (i = 0; i < info->dim; i ++)
       {
       info->size[i] = size[i];
-      len *=  size[i];
+      /* Security: Check for multiplication overflow */
+      if (size[i] != 0 && len > maxVal / size[i])
+        {
+        free(info->size);
+        info->size = NULL;
+        return 0;  /* Overflow would occur */
+        }
+      len *= size[i];
       }
-    
-    info->array = malloc((size_t)(igtl_ndarray_get_nbyte(info->type) * len));
+
+    element_size = igtl_ndarray_get_nbyte(info->type);
+    if (element_size == 0)
+      {
+      free(info->size);
+      info->size = NULL;
+      return 0;  /* Invalid type */
+      }
+
+    /* Security: Check for multiplication overflow in array size */
+    if (len > maxVal / element_size)
+      {
+      free(info->size);
+      info->size = NULL;
+      return 0;  /* Overflow would occur */
+      }
+    array_size = element_size * len;
+
+    info->array = malloc((size_t)array_size);
 
     if (info->array == NULL)
       {
       free(info->size);
+      info->size = NULL;
       return 0;
       }
 
@@ -118,10 +152,14 @@ int igtl_export igtl_ndarray_free_info(igtl_ndarray_info * info)
 int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_info * info, igtl_uint64 pack_size)
 {
   char * ptr;
+  char * ptr_end;
   igtl_uint16 dim;
   igtl_uint16 * size;
   igtl_uint16 i;
   igtl_uint64 len;
+  igtl_uint32 element_size;
+  igtl_uint64 array_data_size;
+  igtl_uint64 expected_size;
 
   igtl_uint16 * ptr16_src;
   igtl_uint16 * ptr16_src_end;
@@ -141,8 +179,15 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
     return 0;
     }
 
+  /* Security: Minimum size check (type + dim = 2 bytes) */
+  if (pack_size < 2)
+    {
+    return 0;
+    }
+
   igtl_ndarray_init_info(info);
   ptr = (char *) byte_array;
+  ptr_end = ptr + pack_size;
 
   /*** Type field ***/
   info->type = * (igtl_uint8 *) ptr;
@@ -152,9 +197,22 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
   info->dim  = * (igtl_uint8 *) ptr;
   ptr ++;
 
+  /* Security: Validate dimension and check size array fits in buffer */
+  dim = info->dim;
+  if (dim == 0 || dim > 255)
+    {
+    return 0;
+    }
+
+  /* Security: Check that size array fits within pack_size */
+  /* Header is 2 bytes, size array is dim * 2 bytes */
+  if (pack_size < (igtl_uint64)(2 + sizeof(igtl_uint16) * dim))
+    {
+    return 0;
+    }
+
   /*** Size array field ***/
   size = (igtl_uint16 *) ptr;
-  dim  = info->dim;
   if (igtl_is_little_endian())
     {
     /* Change byte order -- this overwrites memory area for the pack !!*/
@@ -164,12 +222,24 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
       }
     }
 
-  igtl_ndarray_alloc_info(info, size);
+  /* Security: igtl_ndarray_alloc_info now has overflow checks */
+  if (igtl_ndarray_alloc_info(info, size) == 0)
+    {
+    /* Restore byte order before returning */
+    if (igtl_is_little_endian())
+      {
+      for (i = 0; i < dim; i ++)
+        {
+        size[i] = BYTE_SWAP_INT16(size[i]);
+        }
+      }
+    return 0;
+    }
 
   memcpy(info->size, size, sizeof(igtl_uint16) * dim);
   if (igtl_is_little_endian())
     {
-    /* Resotore the overwritten memory area */
+    /* Restore the overwritten memory area */
     /* Don't use size[] array after this !! */
     for (i = 0; i < dim; i ++)
       {
@@ -186,14 +256,30 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
     len *= info->size[i];
     }
 
+  element_size = igtl_ndarray_get_nbyte(info->type);
+  if (element_size == 0)
+    {
+    igtl_ndarray_free_info(info);
+    return 0;
+    }
+
+  /* Security: Validate that array data fits within pack_size */
+  array_data_size = len * element_size;
+  expected_size = 2 + sizeof(igtl_uint16) * dim + array_data_size;
+  if (pack_size < expected_size)
+    {
+    igtl_ndarray_free_info(info);
+    return 0;  /* Pack too small for claimed array size */
+    }
+
   /* Copy array */
-  if (igtl_ndarray_get_nbyte(info->type) == 1 || !igtl_is_little_endian())
+  if (element_size == 1 || !igtl_is_little_endian())
     {
     /* If single-byte data type is used or the program runs on a big-endian machine,
-       just copy the array from the pack to the strucutre */
-    memcpy(info->array, ptr, (size_t)(len * igtl_ndarray_get_nbyte(info->type)));
+       just copy the array from the pack to the structure */
+    memcpy(info->array, ptr, (size_t)array_data_size);
     }
-  else if (igtl_ndarray_get_nbyte(info->type) == 2) /* 16-bit */
+  else if (element_size == 2) /* 16-bit */
     {
     ptr16_src = (igtl_uint16 *) ptr;
     ptr16_src_end = ptr16_src + len;
@@ -205,7 +291,7 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
       ptr16_src ++;
       }
     }
-  else if (igtl_ndarray_get_nbyte(info->type) == 4) /* 32-bit */
+  else if (element_size == 4) /* 32-bit */
     {
     ptr32_src = (igtl_uint32 *) ptr;
     ptr32_src_end = ptr32_src + len;
@@ -221,7 +307,7 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
     {
     ptr64_src = (igtl_uint64 *) ptr;
     /* Adding number of elements to the pointer -- 64-bit: len * 1; Complex: len * 2*/
-    ptr64_src_end = ptr64_src + len * igtl_ndarray_get_nbyte(info->type)/8;
+    ptr64_src_end = ptr64_src + len * element_size/8;
     ptr64_dst = (igtl_uint64 *) info->array;
     while (ptr64_src < ptr64_src_end)
       {
@@ -230,8 +316,6 @@ int igtl_export igtl_ndarray_unpack(int type, void * byte_array, igtl_ndarray_in
       ptr64_src ++;
       }
     }
-
-  /* TODO: check if the pack size is valid */
 
   return 1;
 

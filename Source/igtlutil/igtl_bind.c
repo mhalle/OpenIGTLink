@@ -80,24 +80,38 @@ int igtl_export igtl_bind_free_info(igtl_bind_info * bind_info)
 
 /*
  * Function to unpack BIND message
+ * Security: Added size parameter and bounds checking to prevent OOB reads
  */
-int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
+int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info, igtl_uint64 size)
 {
   igtl_uint16 i;
   igtl_uint16 ncmessages;
   igtl_uint16 nametable_size;
   size_t      namelen;
   char * ptr;
+  char * ptr_start;
+  char * ptr_end;
   char * ptr2;
   igtl_uint64 tmp64;
-  
+  igtl_uint64 header_section_size;
+  igtl_uint64 total_child_size;
+
   if (byte_array == NULL || info == NULL)
     {
     return 0;
     }
-  
+
+  /* Security: Minimum size check */
+  if (size < sizeof(igtl_uint16))
+    {
+    return 0;
+    }
+
+  ptr_start = (char *) byte_array;
+  ptr_end = ptr_start + size;
+
   /* Number of child messages */
-  ptr = (char *) byte_array;
+  ptr = ptr_start;
   if (igtl_is_little_endian())
     {
     ncmessages = BYTE_SWAP_INT16(*((igtl_uint16*)ptr));
@@ -106,7 +120,17 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
     {
     ncmessages = *((igtl_uint16*)ptr);
     }
-  
+
+  /* Security: Validate header section fits in buffer */
+  /* Header section: ncmessages (2) + ncmessages * (type(12) + size(8)) + nametable_size(2) */
+  header_section_size = sizeof(igtl_uint16) +
+                        (igtl_uint64)ncmessages * (IGTL_HEADER_TYPE_SIZE + sizeof(igtl_uint64)) +
+                        sizeof(igtl_uint16);
+  if (size < header_section_size)
+    {
+    return 0;
+    }
+
   /* Allocate an array of bind_info, if neccessary */
   if (ncmessages != info->ncmessages)
     {
@@ -115,17 +139,17 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
       return 0;
       }
     }
-  
+
   /* Pointer to the first element in the BIND header section */
   ptr += sizeof(igtl_uint16);
-  
+
   /* Extract types and body sizes from the BIND header section */
   for (i = 0; i < ncmessages; i ++)
     {
     /* Type of child message */
     strncpy(info->child_info_array[i].type, (char*)ptr, IGTL_HEADER_TYPE_SIZE);
     info->child_info_array[i].type[IGTL_HEADER_TYPE_SIZE] = '\0';
-    
+
     /* Body size of child message */
     ptr += IGTL_HEADER_TYPE_SIZE;
     if (igtl_is_little_endian())
@@ -153,21 +177,33 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
 
   /*
    * Check if the name table field is aligned to WORD (The length of
-   * the field must be even. 
+   * the field must be even.
    */
   if (nametable_size % 2 != 0)
     {
     return 0;
     }
-  
+
+  /* Security: Validate name table fits in buffer */
+  if (size < header_section_size + nametable_size)
+    {
+    return 0;
+    }
+
   ptr += sizeof(igtl_uint16);
   ptr2 = ptr;
 
   /* Extract device names from the name table section */
   if (nametable_size > 0)
     {
+    char * nametable_end = ptr + nametable_size;
     for (i = 0; i < ncmessages; i ++)
       {
+      /* Security: Check ptr is within name table bounds */
+      if (ptr >= nametable_end)
+        {
+        break;  /* No more names in table */
+        }
       strncpy(info->child_info_array[i].name, ptr, IGTL_HEADER_NAME_SIZE);
       info->child_info_array[i].name[IGTL_HEADER_NAME_SIZE] = '\0';
       namelen = strlen(info->child_info_array[i].name);
@@ -177,6 +213,20 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
 
   ptr = ptr2 + nametable_size;
 
+  /* Security: Calculate total size of child message bodies */
+  total_child_size = 0;
+  for (i = 0; i < ncmessages; i ++)
+    {
+    /* Include padding for odd-sized messages */
+    total_child_size += info->child_info_array[i].size + (info->child_info_array[i].size % 2);
+    }
+
+  /* Security: Validate child bodies fit in buffer */
+  if (size < header_section_size + nametable_size + total_child_size)
+    {
+    return 0;
+    }
+
   /* Set pointers to the child message bodies */
   for (i = 0; i < ncmessages; i ++)
     {
@@ -185,8 +235,6 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
        is odd. */
     ptr += info->child_info_array[i].size + (info->child_info_array[i].size % 2);
     }
-    
-  /** TODO: check the total size of the message? **/
 
   return 1;
 }
@@ -194,6 +242,7 @@ int igtl_bind_unpack_normal(void * byte_array, igtl_bind_info * info)
 
 /*
  * Function to unpack GET_BIND and STT_BIND messages
+ * Security: Added bounds checking to prevent OOB reads
  */
 int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint64 size)
 {
@@ -203,7 +252,8 @@ int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint
   size_t      namelen;
   char * ptr;
   char * ptr2;
-  
+  igtl_uint64 header_section_size;
+
   if (size == 0)
     {
     info->request_all = 1;
@@ -216,7 +266,13 @@ int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint
     {
     return 0;
     }
-  
+
+  /* Security: Minimum size check */
+  if (size < sizeof(igtl_uint16))
+    {
+    return 0;
+    }
+
   /* Number of child messages */
   ptr = (char *) byte_array;
   if (igtl_is_little_endian())
@@ -227,7 +283,17 @@ int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint
     {
     ncmessages = *((igtl_uint16*)ptr);
     }
-  
+
+  /* Security: Validate header section fits in buffer */
+  /* Header section: ncmessages (2) + ncmessages * type(12) + nametable_size(2) */
+  header_section_size = sizeof(igtl_uint16) +
+                        (igtl_uint64)ncmessages * IGTL_HEADER_TYPE_SIZE +
+                        sizeof(igtl_uint16);
+  if (size < header_section_size)
+    {
+    return 0;
+    }
+
   /* Allocate an array of bind_info, if neccessary */
   if (ncmessages != info->ncmessages)
     {
@@ -236,10 +302,10 @@ int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint
       return 0;
       }
     }
-  
+
   /* Pointer to the first element in the BIND header section */
   ptr += sizeof(igtl_uint16);
-  
+
   /* Extract types and body sizes from the BIND header section */
   for (i = 0; i < ncmessages; i ++)
     {
@@ -261,29 +327,39 @@ int igtl_bind_unpack_request(void * byte_array, igtl_bind_info * info, igtl_uint
 
   /*
    * Check if the name table field is aligned to WORD (The length of
-   * the field must be even. 
+   * the field must be even.
    */
   if (nametable_size % 2 != 0)
     {
     return 0;
     }
-  
+
+  /* Security: Validate name table fits in buffer */
+  if (size < header_section_size + nametable_size)
+    {
+    return 0;
+    }
+
   ptr += sizeof(igtl_uint16);
   ptr2 = ptr;
 
   /* Extract device names from the name table section */
   if (nametable_size > 0)
     {
+    char * nametable_end = ptr + nametable_size;
     for (i = 0; i < ncmessages; i ++)
       {
+      /* Security: Check ptr is within name table bounds */
+      if (ptr >= nametable_end)
+        {
+        break;  /* No more names in table */
+        }
       strncpy(info->child_info_array[i].name, ptr, IGTL_HEADER_NAME_SIZE);
       info->child_info_array[i].name[IGTL_HEADER_NAME_SIZE] = '\0';
       namelen = strlen(info->child_info_array[i].name);
       ptr += namelen + 1;
       }
     }
-
-  /** TODO: check the total size of the message? **/
 
   return 1;
 }
@@ -297,7 +373,7 @@ int igtl_export igtl_bind_unpack(int type, void * byte_array, igtl_bind_info * i
     {
 
     case IGTL_TYPE_PREFIX_NONE:
-      return igtl_bind_unpack_normal(byte_array, info);
+      return igtl_bind_unpack_normal(byte_array, info, size);
       break;
 
     case IGTL_TYPE_PREFIX_GET:
@@ -309,6 +385,11 @@ int igtl_export igtl_bind_unpack(int type, void * byte_array, igtl_bind_info * i
        * STT_BIND message has the same format as GET_BIND, except that it
        * has the time resolution field.
        */
+      /* Security: Validate buffer has enough data for time resolution field */
+      if (size < sizeof(igtl_uint64))
+        {
+        return 0;
+        }
       /* Obtain time resolution */
       ptr = byte_array;
       if (igtl_is_little_endian())
@@ -330,6 +411,11 @@ int igtl_export igtl_bind_unpack(int type, void * byte_array, igtl_bind_info * i
       break;
 
     case IGTL_TYPE_PREFIX_RTS:
+      /* Security: Validate buffer has enough data for status field */
+      if (size < sizeof(igtl_uint8))
+        {
+        return 0;
+        }
       info->status = * (igtl_uint8 *) byte_array;
       return 1;
       break;

@@ -118,21 +118,36 @@ int StringMessage::UnpackContent()
 {
   igtl_string_header * string_header;
   char * string;
+  const size_t headerSize = sizeof(igtlUint16)*2;  // encoding + length fields
 #if OpenIGTLink_HEADER_VERSION >= 2
   string_header = (igtl_string_header*) (this->m_Content);
-  string        = (char *) this->m_Content + sizeof(igtlUint16)*2;
+  string        = (char *) this->m_Content + headerSize;
 #elif OpenIGTLink_PROTOCOL_VERSION <=2
   string_header = (igtl_string_header*) this->m_Body;
-  string        = (char *) this->m_Body + sizeof(igtlUint16)*2;
+  string        = (char *) this->m_Body + headerSize;
 #endif
 
   // Convert byte order from network to host
   igtl_string_convert_byte_order(string_header);
-  
+
+  // Security: Validate that claimed length fits within actual received content
+  bool isUnpacked = true;
+  igtl_uint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (contentSize < headerSize)
+    {
+    return 0;  // Content too small to contain header
+    }
+  igtl_uint64 maxStringLength = contentSize - headerSize;
+  igtl_uint16 safeLength = string_header->length;
+  if (safeLength > maxStringLength)
+    {
+    safeLength = static_cast<igtl_uint16>(maxStringLength);
+    }
+
   // Copy data
   this->m_Encoding = string_header->encoding;
   this->m_String.clear();
-  this->m_String.append(string, string_header->length);
+  this->m_String.append(string, safeLength);
 
   return 1;
 }
