@@ -358,16 +358,23 @@ int TrackingDataMessage::PackContent()
   
 int TrackingDataMessage::UnpackContent()
 {
-    
+
   this->m_TrackingDataList.clear();
-    
+
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
   igtl_tdata_element* element = NULL;
   int nElement = 0;
 
   element = (igtl_tdata_element*)(this->m_Content);
-  bool isUnpacked(true);
-  nElement = igtl_tdata_get_data_n(CalculateReceiveContentSize(isUnpacked));
-    
+  nElement = igtl_tdata_get_data_n(contentSize);
+
   igtl_tdata_convert_byte_order(element, nElement);
     
   char strbuf[128];

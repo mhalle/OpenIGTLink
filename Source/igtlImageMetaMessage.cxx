@@ -284,8 +284,16 @@ int ImageMetaMessage::UnpackContent()
 
   this->m_ImageMetaList.clear();
 
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
   igtl_imgmeta_element* element = (igtl_imgmeta_element*) this->m_Content;
-  int nElement = igtl_imgmeta_get_data_n(this->m_BodySizeToRead);
+  int nElement = igtl_imgmeta_get_data_n(contentSize);
 
   igtl_imgmeta_convert_byte_order(element, nElement);
   

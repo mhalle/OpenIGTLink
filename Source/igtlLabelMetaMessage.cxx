@@ -260,8 +260,16 @@ int LabelMetaMessage::UnpackContent()
 
   this->m_LabelMetaList.clear();
 
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
   igtl_lbmeta_element* element = (igtl_lbmeta_element*) this->m_Content;
-  int nElement = igtl_lbmeta_get_data_n(this->m_BodySizeToRead);
+  int nElement = igtl_lbmeta_get_data_n(contentSize);
 
   igtl_lbmeta_convert_byte_order(element, nElement);
   

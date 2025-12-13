@@ -254,17 +254,25 @@ int PointMessage::PackContent()
 int PointMessage::UnpackContent()
 {
   this->m_PointList.clear();
+
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
   igtl_point_element* element = NULL;
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2
   element = (igtl_point_element*) (this->m_Content);
-  bool isUnpacked(true);
-  nElement = igtl_point_get_data_n(CalculateReceiveContentSize(isUnpacked));
+  nElement = igtl_point_get_data_n(contentSize);
 #elif OpenIGTLink_PROTOCOL_VERSION <=2
   element = (igtl_point_element*) this->m_Body;
   nElement = igtl_point_get_data_n(this->m_BodySizeToRead);
 #endif
-  
+
   igtl_point_convert_byte_order(element, nElement);
   
   char strbuf[128];

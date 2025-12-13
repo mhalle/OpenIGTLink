@@ -320,17 +320,24 @@ int TrajectoryMessage::UnpackContent()
 {
   this->m_TrajectoryList.clear();
 
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
   igtl_trajectory_element* element = NULL;
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2
   element = (igtl_trajectory_element*)(this->m_Content);
-  bool isUnpacked(true);
-  nElement = igtl_trajectory_get_data_n(CalculateReceiveContentSize(isUnpacked));
+  nElement = igtl_trajectory_get_data_n(contentSize);
 #elif OpenIGTLink_PROTOCOL_VERSION <=2
   element = (igtl_trajectory_element*)this->m_Body;
   nElement = igtl_trajectory_get_data_n(this->m_BodySizeToRead);
 #endif
-  
+
   igtl_trajectory_convert_byte_order(element, nElement);
   
   char strbuf[128];

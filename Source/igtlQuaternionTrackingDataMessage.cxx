@@ -204,8 +204,16 @@ int StartQuaternionTrackingDataMessage::PackContent()
 
 int StartQuaternionTrackingDataMessage::UnpackContent()
 {
+  /* Security: Validate content size before accessing struct fields */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_STT_QTDATA_SIZE)
+    {
+    return 0;
+    }
+
   igtl_stt_qtdata* stt_qtdata = (igtl_stt_qtdata*)this->m_Content;
-  
+
   igtl_stt_qtdata_convert_byte_order(stt_qtdata);
 
   this->m_Resolution = stt_qtdata->resolution;
@@ -250,14 +258,22 @@ int  RTSQuaternionTrackingDataMessage::PackContent()
 
 
 int  RTSQuaternionTrackingDataMessage::UnpackContent()
-{ 
+{
+  /* Security: Validate content size before accessing struct fields */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = this->CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked || contentSize < IGTL_RTS_QTDATA_SIZE)
+    {
+    return 0;
+    }
+
   igtl_rts_qtdata* rts_qtdata = (igtl_rts_qtdata*)this->m_Content;
-  
+
   igtl_rts_qtdata_convert_byte_order(rts_qtdata);
 
   this->m_Status= rts_qtdata->status;
 
-  return 1; 
+  return 1;
 }
 
 
@@ -353,12 +369,19 @@ int QuaternionTrackingDataMessage::UnpackContent()
 {
   this->m_QuaternionTrackingDataList.clear();
 
+  /* Security: Validate content size is available */
+  bool isUnpacked(true);
+  igtlUint64 contentSize = CalculateReceiveContentSize(isUnpacked);
+  if (!isUnpacked)
+    {
+    return 0;
+    }
+
   igtl_qtdata_element* element = NULL;
   int nElement = 0;
 #if OpenIGTLink_HEADER_VERSION >= 2
   element = (igtl_qtdata_element*) (this->m_Content);
-  bool isUnpacked(true);
-  nElement = igtl_qtdata_get_data_n(CalculateReceiveContentSize(isUnpacked));
+  nElement = igtl_qtdata_get_data_n(contentSize);
 #elif OpenIGTLink_PROTOCOL_VERSION <=2
   element = (igtl_qtdata_element*) this->m_Body;
   nElement = igtl_qtdata_get_data_n(this->m_BodySizeToRead);
