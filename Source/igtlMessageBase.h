@@ -95,6 +95,21 @@ namespace igtl
       UNPACK_BODY    = 0x0002
     };
 
+    /// Default maximum message size (1 GB). Set to 0 to disable limit.
+    static const igtl_uint64 DEFAULT_MAX_MESSAGE_SIZE = 1073741824ULL;
+
+    /// Set the default maximum message size for all new messages (0 = no limit)
+    static void SetDefaultMaxMessageSize(igtl_uint64 size);
+
+    /// Get the default maximum message size
+    static igtl_uint64 GetDefaultMaxMessageSize();
+
+    /// Set the maximum message size for this instance (0 = no limit)
+    void SetMaxMessageSize(igtl_uint64 size);
+
+    /// Get the maximum message size for this instance
+    igtl_uint64 GetMaxMessageSize() const;
+
   public:
     /// Create a clone of this message, new memory but all internals are preserved
     virtual igtl::MessageBase::Pointer Clone();
@@ -339,6 +354,12 @@ namespace igtl
 
     /// Packing (serialization) status for the body
     bool           m_IsBodyPacked;
+
+    /// Maximum message size for this instance (0 = no limit)
+    igtl_uint64    m_MaxMessageSize;
+
+    /// Default maximum message size for all instances
+    static igtl_uint64 s_DefaultMaxMessageSize;
 
 #if OpenIGTLink_HEADER_VERSION >= 2
   protected:

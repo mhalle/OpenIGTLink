@@ -44,6 +44,13 @@ enum action_type {
   SEVERCREATED
 };
 
+/// Origin validation mode for WebSocket connections
+enum OriginValidationMode {
+  ORIGIN_ALLOW_ALL,       ///< Allow connections from any origin (default)
+  ORIGIN_LOCALHOST_ONLY,  ///< Only allow localhost/127.0.0.1 origins
+  ORIGIN_CUSTOM           ///< Use custom allowed origins list
+};
+
 struct action {
   action(action_type t, connection_hdl h) : type(t), hdl(h) {}
   action(action_type t, connection_hdl h, std::string  m)
@@ -71,6 +78,16 @@ class webSocketServer{
     void on_http(connection_hdl hdl);
     void on_open(connection_hdl hdl);
     void on_close(connection_hdl hdl);
+    bool on_validate(connection_hdl hdl);
+
+    /// Set origin validation mode (default: ORIGIN_ALLOW_ALL)
+    void SetOriginValidationMode(OriginValidationMode mode);
+
+    /// Add an allowed origin (only used when mode is ORIGIN_CUSTOM)
+    void AddAllowedOrigin(const std::string& origin);
+
+    /// Clear all custom allowed origins
+    void ClearAllowedOrigins();
     webSocketServer* WaitForConnection(unsigned long msec);
     void SetTimeInterval(unsigned int time);
     void on_timer();
@@ -97,6 +114,9 @@ class webSocketServer{
     mutex m_action_lock;
     mutex m_connection_lock;
     condition_variable m_action_cond;
+
+    OriginValidationMode m_originValidationMode;
+    std::set<std::string> m_allowedOrigins;
 };
 
 

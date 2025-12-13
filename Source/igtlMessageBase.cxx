@@ -30,6 +30,9 @@ namespace
 namespace igtl
 {
 
+// Initialize static member - default to 1GB limit, set to 0 to disable
+igtl_uint64 MessageBase::s_DefaultMaxMessageSize = MessageBase::DEFAULT_MAX_MESSAGE_SIZE;
+
 MessageBase::MessageBase()
   : Object()
     , m_MessageSize(0)
@@ -46,6 +49,7 @@ MessageBase::MessageBase()
     , m_IsHeaderUnpacked(false)
     , m_IsBodyUnpacked(false)
     , m_IsBodyPacked(false)
+    , m_MaxMessageSize(s_DefaultMaxMessageSize)
 #if OpenIGTLink_HEADER_VERSION >= 2
     , m_ExtendedHeader(NULL)
     , m_IsExtendedHeaderUnpacked(false)
@@ -76,6 +80,26 @@ MessageBase::~MessageBase()
 igtlUint64 MessageBase::CalculateContentBufferSize()
 {
   return 0;
+}
+
+void MessageBase::SetDefaultMaxMessageSize(igtl_uint64 size)
+{
+  s_DefaultMaxMessageSize = size;
+}
+
+igtl_uint64 MessageBase::GetDefaultMaxMessageSize()
+{
+  return s_DefaultMaxMessageSize;
+}
+
+void MessageBase::SetMaxMessageSize(igtl_uint64 size)
+{
+  m_MaxMessageSize = size;
+}
+
+igtl_uint64 MessageBase::GetMaxMessageSize() const
+{
+  return m_MaxMessageSize;
 }
 
 igtl::MessageBase::Pointer MessageBase::Clone()
@@ -981,7 +1005,24 @@ void MessageBase::AllocateUnpack(igtl_uint64 bodySizeToRead)
     m_IsBodyUnpacked = false;
     }
 
+  // Security: Check for integer overflow in size calculation
+  const igtl_uint64 maxVal = ~(igtl_uint64)0;
+  if (bodySizeToRead > maxVal - IGTL_HEADER_SIZE)
+    {
+    // Overflow would occur
+    m_IsBodyUnpacked = false;
+    return;
+    }
+
   igtl_uint64 message_size = IGTL_HEADER_SIZE + bodySizeToRead;
+
+  // Security: Check against maximum message size (if limit is set)
+  if (m_MaxMessageSize > 0 && message_size > m_MaxMessageSize)
+    {
+    // Message exceeds maximum allowed size - refuse to allocate
+    m_IsBodyUnpacked = false;
+    return;
+    }
 
   if (m_Header == NULL)
     {
@@ -997,7 +1038,7 @@ void MessageBase::AllocateUnpack(igtl_uint64 bodySizeToRead)
     // m_IsHeaderUnpacked status is not changed in this case.
     unsigned char* old = m_Header;
     m_Header = new unsigned char [message_size];
-    memcpy(m_Header, old, std::min<int>(m_MessageSize, message_size));
+    memcpy(m_Header, old, std::min<igtl_uint64>(m_MessageSize, message_size));
     delete [] old;
     m_IsBodyUnpacked = false;
     }

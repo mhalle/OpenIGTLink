@@ -8,20 +8,21 @@
 
 #include "igtlWebServerSocket.h"
 
-webSocketServer::webSocketServer() : m_count(0) {
+webSocketServer::webSocketServer() : m_count(0), m_originValidationMode(ORIGIN_ALLOW_ALL) {
   // set up access channels to only log interesting things
   m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
   m_endpoint.set_access_channels(websocketpp::log::alevel::access_core);
   m_endpoint.set_access_channels(websocketpp::log::alevel::app);
-  
+
   // Initialize the Asio transport policy
   m_endpoint.init_asio();
-  
+
   // Bind the handlers we are using
   using websocketpp::lib::placeholders::_1;
   m_endpoint.set_open_handler(bind(&webSocketServer::on_open,this,_1));
   m_endpoint.set_close_handler(bind(&webSocketServer::on_close,this,_1));
   m_endpoint.set_http_handler(bind(&webSocketServer::on_http,this,_1));
+  m_endpoint.set_validate_handler(bind(&webSocketServer::on_validate,this,_1));
   m_timeInterval = 1;
 }
 
@@ -203,4 +204,79 @@ void webSocketServer::on_open(connection_hdl hdl) {
 
 void webSocketServer::on_close(connection_hdl hdl) {
   m_connections.erase(hdl);
+}
+
+bool webSocketServer::on_validate(connection_hdl hdl) {
+  // Allow all connections if validation is disabled (default)
+  if (m_originValidationMode == ORIGIN_ALLOW_ALL)
+    {
+    return true;
+    }
+
+  server::connection_ptr con = m_endpoint.get_con_from_hdl(hdl);
+  std::string origin = con->get_request_header("Origin");
+
+  if (m_originValidationMode == ORIGIN_LOCALHOST_ONLY)
+    {
+    // Check if origin is localhost (any port)
+    // Valid patterns: http://localhost, http://localhost:PORT,
+    //                 http://127.0.0.1, http://127.0.0.1:PORT,
+    //                 https:// variants, and file://
+    if (origin.empty())
+      {
+      // No origin header - could be non-browser client, allow it
+      return true;
+      }
+    if (origin == "file://")
+      {
+      return true;
+      }
+    // Check for localhost patterns
+    if (origin.find("://localhost") != std::string::npos ||
+        origin.find("://127.0.0.1") != std::string::npos ||
+        origin.find("://[::1]") != std::string::npos)
+      {
+      return true;
+      }
+    // Reject non-localhost origins
+    return false;
+    }
+
+  if (m_originValidationMode == ORIGIN_CUSTOM)
+    {
+    // No origin header - could be non-browser client, allow it
+    if (origin.empty())
+      {
+      return true;
+      }
+    // Check against allowed origins list
+    if (m_allowedOrigins.find(origin) != m_allowedOrigins.end())
+      {
+      return true;
+      }
+    // Check for prefix match (to handle ports)
+    for (std::set<std::string>::const_iterator it = m_allowedOrigins.begin();
+         it != m_allowedOrigins.end(); ++it)
+      {
+      if (origin.find(*it) == 0)
+        {
+        return true;
+        }
+      }
+    return false;
+    }
+
+  return true;
+}
+
+void webSocketServer::SetOriginValidationMode(OriginValidationMode mode) {
+  m_originValidationMode = mode;
+}
+
+void webSocketServer::AddAllowedOrigin(const std::string& origin) {
+  m_allowedOrigins.insert(origin);
+}
+
+void webSocketServer::ClearAllowedOrigins() {
+  m_allowedOrigins.clear();
 }
