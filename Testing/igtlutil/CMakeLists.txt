@@ -63,3 +63,8 @@ IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "1")
   ADD_TEST(igtl_ndarray_test_01    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtl_ndarray_test )
   ADD_TEST(igtl_polydata_test_01   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtl_polydata_test )
 ENDIF()
+
+# Security Tests for C utilities
+ADD_EXECUTABLE(igtl_security_test   igtl_security_test.c)
+TARGET_LINK_LIBRARIES(igtl_security_test OpenIGTLink)
+ADD_TEST(igtl_security_test ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtl_security_test)

@@ -30,7 +30,8 @@ namespace
 namespace igtl
 {
 
-// Initialize static member - default to 1GB limit, set to 0 to disable
+// Initialize static members
+const igtl_uint64 MessageBase::DEFAULT_MAX_MESSAGE_SIZE;
 igtl_uint64 MessageBase::s_DefaultMaxMessageSize = MessageBase::DEFAULT_MAX_MESSAGE_SIZE;
 
 MessageBase::MessageBase()

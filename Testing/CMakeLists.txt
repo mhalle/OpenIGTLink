@@ -86,6 +86,12 @@ IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" AND (OpenIGTLink_USE_H264 OR Open
   ADD_EXECUTABLE(igtlVideoMetaMessageTest   igtlVideoMetaMessageTest.cxx)
 ENDIF()
 
+# Security Tests
+ADD_EXECUTABLE(igtlMessageSecurityTest   igtlMessageSecurityTest.cxx)
+IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" AND (OpenIGTLink_USE_H264 OR OpenIGTLink_USE_VP9 OR (OpenIGTLink_USE_X265 AND OpenIGTLink_USE_OpenHEVC) OR OpenIGTLink_USE_AV1))
+  ADD_EXECUTABLE(igtlVideoMessageSecurityTest   igtlVideoMessageSecurityTest.cxx)
+ENDIF()
+
 
 IF(OpenIGTLink_USE_GTEST AND (NOT OpenIGTLink_BUILD_SHARED_LIBS))
   SET(GTEST_LINK OpenIGTLink gtest_main gtest gmock_main gmock)
@@ -132,6 +138,12 @@ ENDIF()
 IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" AND (OpenIGTLink_USE_H264 OR OpenIGTLink_USE_VP9 OR (OpenIGTLink_USE_X265 AND OpenIGTLink_USE_OpenHEVC) OR OpenIGTLink_USE_AV1))
   TARGET_LINK_LIBRARIES(igtlVideoMessageTest ${GTEST_LINK})
   TARGET_LINK_LIBRARIES(igtlVideoMetaMessageTest ${GTEST_LINK})
+ENDIF()
+
+# Security Tests Link Libraries
+TARGET_LINK_LIBRARIES(igtlMessageSecurityTest ${GTEST_LINK})
+IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" AND (OpenIGTLink_USE_H264 OR OpenIGTLink_USE_VP9 OR (OpenIGTLink_USE_X265 AND OpenIGTLink_USE_OpenHEVC) OR OpenIGTLink_USE_AV1))
+  TARGET_LINK_LIBRARIES(igtlVideoMessageSecurityTest ${GTEST_LINK})
 ENDIF()
 
 
@@ -204,4 +216,10 @@ IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" AND (OpenIGTLink_USE_H264 OR Open
   ADD_TEST(igtlVideoMessageTestFormatVersion1 ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtlVideoMessageTest ${TestStringFormat1})
   ADD_TEST(igtlVideoMessageTestFormatVersion2 ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtlVideoMessageTest ${TestStringFormat2})
   ADD_TEST(igtlVideoMetaMessageTestFormatVersion2 ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtlVideoMetaMessageTest ${TestStringFormat2})
+ENDIF()
+
+# Security Tests
+ADD_TEST(igtlMessageSecurityTest ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtlMessageSecurityTest)
+IF(${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" AND (OpenIGTLink_USE_H264 OR OpenIGTLink_USE_VP9 OR (OpenIGTLink_USE_X265 AND OpenIGTLink_USE_OpenHEVC) OR OpenIGTLink_USE_AV1))
+  ADD_TEST(igtlVideoMessageSecurityTest ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/igtlVideoMessageSecurityTest)
 ENDIF()
