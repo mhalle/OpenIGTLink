@@ -75,6 +75,7 @@ namespace igtl {
   MessageBase()
   {
     endian        = ENDIAN_BIG;
+    bitStreamSize = 0;
     m_FrameHeader = NULL;
     m_Frame       = NULL;
 
@@ -115,21 +116,11 @@ namespace igtl {
       }
   }
   
-  /// This should only be called when the data is unpacked
+  /// Returns the bitstream size. On the sender side this is set via SetBitStreamSize().
+  /// On the receiver side this is computed from the validated content size during UnpackContent().
   int VideoMessage::GetBitStreamSize()
   {
-  #if OpenIGTLink_HEADER_VERSION >= 2
-    if (m_HeaderVersion == IGTL_HEADER_VERSION_2)
-      {
-      return GetPackBodySize()-IGTL_VIDEO_HEADER_SIZE - IGTL_EXTENDED_HEADER_SIZE - GetMetaDataHeaderSize() - GetMetaDataSize();
-      }
-    else
-      {
-      return GetPackBodySize()-IGTL_VIDEO_HEADER_SIZE;
-      }
-  #else
-    return GetPackBodySize()-IGTL_VIDEO_HEADER_SIZE;
-  #endif
+    return bitStreamSize;
   };
   
   void VideoMessage::SetBitStreamSize(int size)
@@ -271,6 +262,11 @@ namespace igtl {
       return 0;
       }
 
+    /* Security: Compute and store the validated bitstream size.
+       This ensures GetBitStreamSize() returns the actual received size,
+       not the potentially malicious header value. */
+    this->bitStreamSize = static_cast<int>(contentSize - IGTL_VIDEO_HEADER_SIZE);
+
   #if OpenIGTLink_HEADER_VERSION >= 2
     if (m_HeaderVersion == IGTL_HEADER_VERSION_2)
       {
@@ -288,7 +284,7 @@ namespace igtl {
 
     igtl_frame_header* frame_header = (igtl_frame_header*)m_FrameHeader;
     igtl_frame_convert_byte_order(frame_header);
-    
+
     if (frame_header->header_version == IGTL_VIDEO_HEADER_VERSION)
       {
       // Video format version 1
@@ -328,7 +324,7 @@ namespace igtl {
 
       this->m_Frame = this->m_FrameHeader;
       this->m_Frame += IGTL_VIDEO_HEADER_SIZE;
-      
+
       return 1;
       }
     else

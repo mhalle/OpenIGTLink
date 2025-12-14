@@ -268,7 +268,9 @@ public:
   /// Gets the origin/orientation matrix.
   void GetMatrix(Matrix4x4& mat);
 
-  /// This should only be called when the data is unpacked
+  /// Returns the bitstream size (the encoded video frame payload).
+  /// On the sender side, this is set via SetBitStreamSize() before packing.
+  /// On the receiver side, this is computed from the validated content size during UnpackContent().
   int  GetBitStreamSize();
   
   // Get the packed bit stream size
