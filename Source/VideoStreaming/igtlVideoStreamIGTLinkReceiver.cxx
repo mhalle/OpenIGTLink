@@ -234,7 +234,11 @@ void VideoStreamIGTLinkReceiver::SendStopMessage()
 int VideoStreamIGTLinkReceiver::RunOnUDPSocket()
 {
   igtl::ConditionVariable::Pointer conditionVar = igtl::ConditionVariable::New();
-  igtl::SimpleMutexLock* glock = igtl::SimpleMutexLock::New();
+  /* Security: Use the same mutex as MessageRTPWrapper::UnWrapPacketWithTypeAndName()
+     to properly synchronize access to rtpWrapper->unWrappedMessages.
+     Previously, a new local mutex was created here, causing a race condition
+     where producer and consumer threads used different mutexes. */
+  igtl::SimpleMutexLock* glock = rtpWrapper->glock;
   UDPSocket->JoinNetwork("127.0.0.1", UDPClientPort);
   ReadSocketAndPush info;
   info.wrapper = rtpWrapper;
@@ -470,6 +474,15 @@ int VideoStreamIGTLinkReceiver::ProcessVideoStream(igtl_uint8* bitStream, int st
     }
 
   this->InitializeDecodedFrame();
+
+  /* Security: Verify decodedFrame was successfully allocated.
+     InitializeDecodedFrame() may fail if dimensions are invalid (0 or > MAX_VIDEO_DIMENSION),
+     leaving decodedFrame as null. Proceeding with a null buffer would crash the decoder. */
+  if (this->decodedFrame == NULL)
+    {
+    return 0;  /* Drop frame - invalid dimensions or allocation failed */
+    }
+
   igtl_uint32 dimensions[2] = {static_cast<igtl_uint32>(Width), static_cast<igtl_uint32>(Height)};
   igtl_uint64 bitStreamLength = streamLength;
   int status = decodeInstance->DecodeBitStreamIntoFrame(bitStream, this->decodedFrame, dimensions , bitStreamLength);
