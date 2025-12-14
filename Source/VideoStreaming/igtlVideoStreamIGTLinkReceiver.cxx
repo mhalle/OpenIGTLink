@@ -397,14 +397,35 @@ int VideoStreamIGTLinkReceiver::ParseConfigForClient()
   return 0;
 }
 
+/* Security: Maximum allowed video dimension to prevent integer overflow.
+   16384x16384 at YUV420 (1.5 bytes/pixel) = 384MB per frame, which is
+   already excessive for real-time medical video streaming. */
+static const int MAX_VIDEO_DIMENSION = 16384;
+
 void VideoStreamIGTLinkReceiver::SetWidth(int iWidth)
 {
-  this->Width = iWidth;
+  /* Security: Validate dimension is within safe bounds */
+  if (iWidth > 0 && iWidth <= MAX_VIDEO_DIMENSION)
+    {
+    this->Width = iWidth;
+    }
+  else
+    {
+    this->Width = 0;  /* Invalid dimension - set to 0 to prevent allocation */
+    }
 }
 
 void VideoStreamIGTLinkReceiver::SetHeight(int iHeight)
 {
-  this->Height = iHeight;
+  /* Security: Validate dimension is within safe bounds */
+  if (iHeight > 0 && iHeight <= MAX_VIDEO_DIMENSION)
+    {
+    this->Height = iHeight;
+    }
+  else
+    {
+    this->Height = 0;  /* Invalid dimension - set to 0 to prevent allocation */
+    }
 }
 
 void VideoStreamIGTLinkReceiver::InitializeDecodedFrame()
@@ -414,7 +435,28 @@ void VideoStreamIGTLinkReceiver::InitializeDecodedFrame()
     delete[] this->decodedFrame;
     }
   this->decodedFrame = NULL;
-  this->decodedFrame = new unsigned char[this->Width*this->Height*3>>1];
+
+  /* Security: Validate dimensions before allocation to prevent integer overflow.
+     YUV420 format requires Width*Height*3/2 bytes. Using size_t for safe computation. */
+  if (this->Width <= 0 || this->Height <= 0 ||
+      this->Width > MAX_VIDEO_DIMENSION || this->Height > MAX_VIDEO_DIMENSION)
+    {
+    return;  /* Invalid dimensions - do not allocate */
+    }
+
+  /* Compute size using size_t to prevent overflow */
+  size_t width = static_cast<size_t>(this->Width);
+  size_t height = static_cast<size_t>(this->Height);
+  size_t frameSize = (width * height * 3) >> 1;  /* YUV420: 1.5 bytes per pixel */
+
+  /* Additional overflow check: if frameSize wrapped around or is unreasonably large */
+  size_t maxReasonableSize = static_cast<size_t>(MAX_VIDEO_DIMENSION) * MAX_VIDEO_DIMENSION * 3 / 2;
+  if (frameSize == 0 || frameSize > maxReasonableSize)
+    {
+    return;  /* Overflow detected or size too large */
+    }
+
+  this->decodedFrame = new unsigned char[frameSize];
 }
 
 int VideoStreamIGTLinkReceiver::ProcessVideoStream(igtl_uint8* bitStream, int streamLength)

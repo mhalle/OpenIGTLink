@@ -388,10 +388,15 @@ namespace igtl {
                 *(UDPPacket + fragFieldOffset) = NoFragmentIndicator; // set the fragment no. to 0000
                 }
               int copyLen = totMsgLen - curPackedMSGLocation;
-              if (copyLen > 0)
+              /* Security: Validate copyLen doesn't exceed firstFragBuffer capacity */
+              if (copyLen > 0 && copyLen <= RTP_PAYLOAD_LENGTH)
                 {
                 memcpy(reorderBuffer->firstFragBuffer, UDPPacket + curPackedMSGLocation, copyLen);
                 reorderBuffer->firstPacketLen = copyLen;
+                }
+              else
+                {
+                reorderBuffer->firstPacketLen = 0;
                 }
               curPackedMSGLocation = totMsgLen;
               reorderBuffer->receivedFirstFrag = true;
@@ -399,17 +404,34 @@ namespace igtl {
               }
             else if(fragmentField>=FragmentEndIndicator)// this is the last fragment
               {
-              reorderBuffer->totFragNumber = fragmentField - FragmentEndIndicator + 1;
+              igtl_uint32 computedTotFragNumber = fragmentField - FragmentEndIndicator + 1;
+              /* Security: Validate total fragment count is within allowed bounds.
+                 Maximum is 16384 fragments (14-bit field). */
+              const igtl_uint32 maxTotalFragments = 16384;
+              if (computedTotFragNumber > maxTotalFragments)
+                {
+                /* Invalid fragment count - skip this packet */
+                status = WaitingForAnotherPacket;
+                curPackedMSGLocation = totMsgLen;
+                break;
+                }
+              reorderBuffer->totFragNumber = computedTotFragNumber;
               /* Security: Validate payload length before copying */
               int payloadOffset = RTP_HEADER_LENGTH + IGTL_HEADER_SIZE + IGTL_EXTENDED_HEADER_SIZE;
               int payloadLen = totMsgLen - payloadOffset;
-              if (payloadLen > 0)
+              /* Security: Validate payloadLen doesn't exceed lastFragBuffer capacity */
+              if (payloadLen > 0 && payloadLen <= RTP_PAYLOAD_LENGTH)
                 {
                 memcpy(reorderBuffer->lastFragBuffer, UDPPacket + payloadOffset, payloadLen);
                 reorderBuffer->lastPacketLen = payloadLen;
                 }
+              else if (payloadLen <= 0)
+                {
+                reorderBuffer->lastPacketLen = 0;
+                }
               else
                 {
+                /* payloadLen exceeds buffer - truncate or skip */
                 reorderBuffer->lastPacketLen = 0;
                 }
               reorderBuffer->receivedLastFrag = true;
@@ -419,10 +441,23 @@ namespace igtl {
             else if(fragmentField>FragmentBeginIndicator && fragmentField<FragmentEndIndicator)
               {
               int curFragNumber = fragmentField - FragmentBeginIndicator;
+              /* Security: Validate fragment number is within buffer bounds.
+                 The reorder buffer holds at most 16382 middle fragments (indices 0 to 16381).
+                 curFragNumber is 1-indexed, so valid range is 1 to 16382.
+                 Fragment numbers outside this range indicate a malformed or malicious packet. */
+              const int maxMiddleFragments = 16384 - 2; /* Same as buffer size calculation in ReorderBuffer */
+              if (curFragNumber < 1 || curFragNumber > maxMiddleFragments)
+                {
+                /* Invalid fragment number - skip this packet */
+                status = WaitingForAnotherPacket;
+                curPackedMSGLocation = totMsgLen;
+                break;
+                }
               /* Security: Validate payload and buffer offset before copying */
               int payloadOffset = RTP_HEADER_LENGTH + IGTL_HEADER_SIZE + IGTL_EXTENDED_HEADER_SIZE;
               int payloadLen = totMsgLen - payloadOffset;
-              if (payloadLen > 0 && curFragNumber > 0)
+              /* Security: Also validate payloadLen doesn't exceed single fragment capacity */
+              if (payloadLen > 0 && payloadLen <= bodyMsgLength)
                 {
                 memcpy(reorderBuffer->buffer+(curFragNumber-1)*bodyMsgLength, UDPPacket + payloadOffset, payloadLen);
                 }
