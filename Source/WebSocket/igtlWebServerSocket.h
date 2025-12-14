@@ -88,6 +88,13 @@ class webSocketServer{
 
     /// Clear all custom allowed origins
     void ClearAllowedOrigins();
+
+    /// Set maximum file size for HTTP file serving (default: 100MB)
+    void SetMaxHttpFileSize(size_t maxBytes);
+
+    /// Get current maximum file size for HTTP file serving
+    size_t GetMaxHttpFileSize() const;
+
     webSocketServer* WaitForConnection(unsigned long msec);
     void SetTimeInterval(unsigned int time);
     void on_timer();
@@ -117,6 +124,8 @@ class webSocketServer{
 
     OriginValidationMode m_originValidationMode;
     std::set<std::string> m_allowedOrigins;
+
+    size_t m_maxHttpFileSize;  ///< Maximum file size for HTTP serving (default 100MB)
 };
 
 

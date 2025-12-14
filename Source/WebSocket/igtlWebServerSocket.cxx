@@ -8,7 +8,11 @@
 
 #include "igtlWebServerSocket.h"
 
-webSocketServer::webSocketServer() : m_count(0), m_originValidationMode(ORIGIN_ALLOW_ALL) {
+webSocketServer::webSocketServer()
+  : m_count(0)
+  , m_originValidationMode(ORIGIN_ALLOW_ALL)
+  , m_maxHttpFileSize(100 * 1024 * 1024)  /* Default: 100 MB */
+{
   // set up access channels to only log interesting things
   m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
   m_endpoint.set_access_channels(websocketpp::log::alevel::access_core);
@@ -170,30 +174,59 @@ void webSocketServer::on_http(connection_hdl hdl) {
 
   //m_endpoint.get_alog().write(websocketpp::log::alevel::app, "http request2: "+filename);
 
-  file.open(filename.c_str(), std::ios::in);
+  file.open(filename.c_str(), std::ios::in | std::ios::binary);
   if (!file)
     {
     // 404 error
     std::stringstream ss;
-    
+
     ss << "<!doctype html><html><head>"
     << "<title>Error 404 (Resource not found)</title><body>"
     << "<h1>Error 404</h1>"
     << "<p>The requested URL " << filename << " was not found on this server.</p>"
     << "</body></head></html>";
-    
+
     con->set_body(ss.str());
     con->set_status(websocketpp::http::status_code::not_found);
     return;
     }
-  
+
+  /* Security: Enforce maximum file size to prevent memory exhaustion attacks.
+     Without a limit, an attacker can request large files and force the server
+     to allocate unbounded memory, causing crashes or DoS.
+     Default is 100MB, configurable via SetMaxHttpFileSize(). */
   file.seekg(0, std::ios::end);
-  response.reserve(file.tellg());
+  std::streampos fileSize = file.tellg();
+
+  if (fileSize < 0 || static_cast<size_t>(fileSize) > m_maxHttpFileSize)
+    {
+    file.close();
+    con->set_body("<!doctype html><html><head><title>Error 413</title></head>"
+                  "<body><h1>Error 413 - Payload Too Large</h1>"
+                  "<p>The requested file exceeds the maximum allowed size.</p></body></html>");
+    con->set_status(websocketpp::http::status_code::request_entity_too_large);
+    return;
+    }
+
   file.seekg(0, std::ios::beg);
-  
-  response.assign((std::istreambuf_iterator<char>(file)),
-                  std::istreambuf_iterator<char>());
-  
+
+  /* Reserve and read with validated size */
+  try
+    {
+    response.reserve(static_cast<size_t>(fileSize));
+    response.assign((std::istreambuf_iterator<char>(file)),
+                    std::istreambuf_iterator<char>());
+    }
+  catch (const std::bad_alloc&)
+    {
+    file.close();
+    con->set_body("<!doctype html><html><head><title>Error 500</title></head>"
+                  "<body><h1>Error 500 - Internal Server Error</h1></body></html>");
+    con->set_status(websocketpp::http::status_code::internal_server_error);
+    return;
+    }
+
+  file.close();
   con->set_body(response);
   con->set_status(websocketpp::http::status_code::ok);
 }
@@ -279,4 +312,12 @@ void webSocketServer::AddAllowedOrigin(const std::string& origin) {
 
 void webSocketServer::ClearAllowedOrigins() {
   m_allowedOrigins.clear();
+}
+
+void webSocketServer::SetMaxHttpFileSize(size_t maxBytes) {
+  m_maxHttpFileSize = maxBytes;
+}
+
+size_t webSocketServer::GetMaxHttpFileSize() const {
+  return m_maxHttpFileSize;
 }

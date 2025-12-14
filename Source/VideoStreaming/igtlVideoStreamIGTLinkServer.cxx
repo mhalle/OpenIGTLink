@@ -330,7 +330,7 @@ static void* ThreadFunctionServer(void* ptr)
           else if (strcmp(headerMsg->GetDeviceType(), "STT_VIDEO") == 0)
             {
             std::cerr << "Received a STT_VIDEO message." << std::endl;
-            
+
             igtl::StartVideoMessage::Pointer startVideoMsg;
             startVideoMsg = igtl::StartVideoMessage::New();
             startVideoMsg->SetMessageHeader(headerMsg);
@@ -342,7 +342,18 @@ static void* ThreadFunctionServer(void* ptr)
             int c = startVideoMsg->Unpack(1);
             if (c & igtl::MessageHeader::UNPACK_BODY && strcmp(startVideoMsg->GetCodecType().c_str(), "H264")) // if CRC check is OK
               {
-              parentObj->interval = startVideoMsg->GetTimeInterval();
+              /* Security: Clamp time_interval to prevent signed integer overflow.
+                 GetTimeInterval() returns igtl_uint32, but interval is signed int.
+                 Values >= 2^31 would wrap to negative, causing Sleep() to return
+                 immediately (EINVAL), spinning the CPU in a tight loop (DoS).
+                 Max reasonable interval for video streaming is 10000ms (10 sec). */
+              igtlUint32 rawInterval = startVideoMsg->GetTimeInterval();
+              const igtlUint32 maxInterval = 10000;  /* 10 seconds max */
+              if (rawInterval > maxInterval)
+                {
+                rawInterval = maxInterval;
+                }
+              parentObj->interval = static_cast<int>(rawInterval);
               strncpy(parentObj->codecName, startVideoMsg->GetCodecType().c_str(), IGTL_VIDEO_CODEC_NAME_SIZE);
               parentObj->serverConnected     = true;
               parentObj->conditionVar->Signal();
