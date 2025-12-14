@@ -812,19 +812,71 @@ void MessageBase::InitBuffer()
 
 void MessageBase::AllocateBuffer(igtlUint64 contentSize)
 {
+  // Security: Check for integer overflow in size calculation
+  const igtl_uint64 maxVal = ~(igtl_uint64)0;
+
 #if OpenIGTLink_HEADER_VERSION >= 2
   igtlUint64 message_size(0);
   if (m_HeaderVersion == IGTL_HEADER_VERSION_2)
     {
-    message_size = IGTL_HEADER_SIZE + contentSize + sizeof(igtl_extended_header) + GetMetaDataHeaderSize() + GetMetaDataSize();
+    // Get metadata sizes first
+    igtlUint64 extHeaderSize = sizeof(igtl_extended_header);
+    igtlUint64 metaHeaderSize = GetMetaDataHeaderSize();
+    igtlUint64 metaDataSize = GetMetaDataSize();
+
+    // Check each addition for overflow
+    if (contentSize > maxVal - IGTL_HEADER_SIZE)
+      {
+      // Overflow would occur
+      return;
+      }
+    igtlUint64 size = IGTL_HEADER_SIZE + contentSize;
+
+    if (size > maxVal - extHeaderSize)
+      {
+      // Overflow would occur
+      return;
+      }
+    size += extHeaderSize;
+
+    if (size > maxVal - metaHeaderSize)
+      {
+      // Overflow would occur
+      return;
+      }
+    size += metaHeaderSize;
+
+    if (size > maxVal - metaDataSize)
+      {
+      // Overflow would occur
+      return;
+      }
+    message_size = size + metaDataSize;
     }
   else
     {
+    if (contentSize > maxVal - IGTL_HEADER_SIZE)
+      {
+      // Overflow would occur
+      return;
+      }
     message_size = IGTL_HEADER_SIZE + contentSize;
     }
 #else
+  if (contentSize > maxVal - IGTL_HEADER_SIZE)
+    {
+    // Overflow would occur
+    return;
+    }
   igtlUint64 message_size = IGTL_HEADER_SIZE + contentSize;
 #endif
+
+  // Security: Check against maximum message size (if limit is set)
+  if (m_MaxMessageSize > 0 && message_size > m_MaxMessageSize)
+    {
+    // Message exceeds maximum allowed size - refuse to allocate
+    return;
+    }
 
   if (m_Header == NULL)
     {
