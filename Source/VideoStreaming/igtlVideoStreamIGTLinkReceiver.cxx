@@ -46,9 +46,16 @@ void* ThreadFunctionUnWrap(void* ptr)
 
 void WriteTimeInfo(unsigned char * UDPPacket, int totMsgLen, VideoStreamIGTLinkReceiver* receiver)
 {
+  /* Security: Validate packet is large enough before accessing header fields */
+  int extendedHeaderLength = IGTL_EXTENDED_HEADER_SIZE;
+  int minRequiredLen = RTP_HEADER_LENGTH + IGTL_HEADER_SIZE + extendedHeaderLength;
+  if (totMsgLen < minRequiredLen)
+    {
+    return; /* Packet too short, cannot safely read header fields */
+    }
+
   igtl_uint16 fragmentField;
   igtl_uint32 messageID;
-  int extendedHeaderLength = IGTL_EXTENDED_HEADER_SIZE;
   memcpy(&fragmentField, (void*)(UDPPacket + RTP_HEADER_LENGTH+IGTL_HEADER_SIZE+extendedHeaderLength-2),2);
   memcpy(&messageID, (void*)(UDPPacket + RTP_HEADER_LENGTH+IGTL_HEADER_SIZE+extendedHeaderLength-6),4);
   if(igtl_is_little_endian())
@@ -56,7 +63,7 @@ void WriteTimeInfo(unsigned char * UDPPacket, int totMsgLen, VideoStreamIGTLinkR
     fragmentField = BYTE_SWAP_INT16(fragmentField);
     messageID = BYTE_SWAP_INT32(messageID);
     }
-  
+
 }
 
 
@@ -65,18 +72,22 @@ void* ThreadFunctionReadSocket(void* ptr)
   // Get thread information
   igtl::MultiThreader::ThreadInfo* info =
   static_cast<igtl::MultiThreader::ThreadInfo*>(ptr);
-  
+
   ReadSocketAndPush parentObj = *(static_cast<ReadSocketAndPush*>(info->UserData));
   unsigned char UDPPacket[RTP_PAYLOAD_LENGTH+RTP_HEADER_LENGTH];
   while(1)
     {
     int totMsgLen = parentObj.clientSocket->ReadSocket(UDPPacket, RTP_PAYLOAD_LENGTH+RTP_HEADER_LENGTH);
-    
-    WriteTimeInfo(UDPPacket, totMsgLen, parentObj.receiver);
-    if (totMsgLen>0)
+
+    /* Security: Only process valid packets with positive length.
+       ReadSocket returns <=0 on error or socket closure. */
+    if (totMsgLen <= 0)
       {
-      parentObj.wrapper->PushDataIntoPacketBuffer(UDPPacket, totMsgLen);
+      continue; /* Skip invalid/failed reads */
       }
+
+    WriteTimeInfo(UDPPacket, totMsgLen, parentObj.receiver);
+    parentObj.wrapper->PushDataIntoPacketBuffer(UDPPacket, totMsgLen);
     }
 }
 
@@ -342,8 +353,16 @@ int VideoStreamIGTLinkReceiver::ParseConfigForClient()
           }
       }
       if (strTag[0].compare ("TCPServerIPAddress") == 0) {
+        /* Security: Validate IP address length before copying.
+           Reject overlong strings and use bounded copy with null termination. */
+        if (strTag[1].length() >= IP4AddressStrLen)
+          {
+          fprintf (stderr, "Invalid parameter for IP address: too long\n");
+          return 1;
+          }
         this->TCPServerIPAddress = new char[IP4AddressStrLen];
-        memcpy(this->TCPServerIPAddress, strTag[1].c_str(), IP4AddressStrLen);
+        strncpy(this->TCPServerIPAddress, strTag[1].c_str(), IP4AddressStrLen - 1);
+        this->TCPServerIPAddress[IP4AddressStrLen - 1] = '\0';
         // Use inet_pton() instead of deprecated inet_addr()
         struct in_addr addr;
         if(inet_pton(AF_INET, this->TCPServerIPAddress, &addr) != 1)

@@ -132,8 +132,16 @@ int VideoStreamIGTLinkServer::ParseConfigForServer()
           }
       }
       if (strTag[0].compare ("ClientIPAddress") == 0) {
+        /* Security: Validate IP address length before copying.
+           Reject overlong strings and use bounded copy with null termination. */
+        if (strTag[1].length() >= IP4AddressStrLen)
+          {
+          fprintf (stderr, "Invalid parameter for IP address: too long\n");
+          return 1;
+          }
         this->clientIPAddress = new char[IP4AddressStrLen];
-        memcpy(this->clientIPAddress, strTag[1].c_str(), IP4AddressStrLen);
+        strncpy(this->clientIPAddress, strTag[1].c_str(), IP4AddressStrLen - 1);
+        this->clientIPAddress[IP4AddressStrLen - 1] = '\0';
         // Use inet_pton() instead of deprecated inet_addr()
         struct in_addr addr;
         if(inet_pton(AF_INET, this->clientIPAddress, &addr) != 1)
