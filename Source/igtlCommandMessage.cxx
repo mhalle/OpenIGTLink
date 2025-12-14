@@ -229,6 +229,9 @@ int CommandMessage::UnpackContent()
   // Copy data
   this->m_CommandId = command_header->commandId;
   memcpy(m_CommandName, command_header->commandName, IGTL_COMMAND_NAME_SIZE);
+  /* Security: Ensure null termination to prevent OOB read when
+     GetCommandName() constructs std::string from the buffer. */
+  m_CommandName[IGTL_COMMAND_NAME_SIZE - 1] = '\0';
   this->m_Encoding = command_header->encoding;
   this->m_Command.clear();
   this->m_Command.append(command, safeLength);
